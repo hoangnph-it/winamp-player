@@ -1,68 +1,61 @@
 import SwiftUI
 
-/// Classic Winamp spectrum analyzer visualization
+/// Full-width Winamp spectrum analyzer (shown inside the EQ section or standalone)
 struct AudioVisualizerView: View {
-    @EnvironmentObject var playerManager: AudioPlayerManager
+    @EnvironmentObject var player: AudioPlayerManager
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                // Background
-                RoundedRectangle(cornerRadius: WinampTheme.cornerRadius)
-                    .fill(WinampTheme.displayBackground)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: WinampTheme.cornerRadius)
-                            .stroke(WinampTheme.displayBorder, lineWidth: 0.5)
-                    )
+        GeometryReader { g in
+            let barCount = player.audioLevels.count
+            let spacing: CGFloat = 1.5
+            let totalSpacing = spacing * CGFloat(barCount - 1)
+            let barW = max(2, (g.size.width - totalSpacing) / CGFloat(barCount))
+            let maxH = g.size.height - 2
 
-                // Spectrum bars
-                HStack(alignment: .bottom, spacing: 2) {
-                    ForEach(0..<playerManager.audioLevels.count, id: \.self) { index in
-                        SpectrumBar(
-                            level: CGFloat(playerManager.audioLevels[index]),
-                            maxHeight: geo.size.height - 8
-                        )
+            ZStack {
+                WinampTheme.displayBg
+
+                HStack(alignment: .bottom, spacing: spacing) {
+                    ForEach(0..<barCount, id: \.self) { i in
+                        SpectrumColumn(level: CGFloat(player.audioLevels[i]),
+                                       barWidth: barW, maxHeight: maxH)
                     }
                 }
-                .padding(4)
+                .padding(1)
             }
+            .overlay(Rectangle().stroke(WinampTheme.displayBorder, lineWidth: 0.5))
         }
     }
 }
 
-struct SpectrumBar: View {
+/// Single spectrum column — segmented blocks green → yellow → red
+private struct SpectrumColumn: View {
     let level: CGFloat
+    let barWidth: CGFloat
     let maxHeight: CGFloat
 
+    private let segH: CGFloat = 2.5
+    private let gap: CGFloat = 1
+
     var body: some View {
-        GeometryReader { geo in
-            VStack(spacing: 1) {
-                Spacer()
+        let totalSegs = max(1, Int(maxHeight / (segH + gap)))
+        let litSegs = max(0, Int(level * CGFloat(totalSegs)))
 
-                // Draw segmented bar
-                let barHeight = max(2, level * maxHeight)
-                let segmentCount = max(1, Int(barHeight / 4))
-
-                VStack(spacing: 1) {
-                    ForEach(0..<segmentCount, id: \.self) { i in
-                        let ratio = CGFloat(i) / CGFloat(max(1, segmentCount - 1))
-                        Rectangle()
-                            .fill(barColor(for: ratio))
-                            .frame(height: 3)
-                    }
-                }
-                .frame(height: barHeight)
+        VStack(spacing: gap) {
+            ForEach((0..<totalSegs).reversed(), id: \.self) { i in
+                let lit = i < litSegs
+                Rectangle()
+                    .fill(lit ? color(for: i, of: totalSegs) : WinampTheme.displayBg.opacity(0.3))
+                    .frame(width: barWidth, height: segH)
             }
         }
     }
 
-    private func barColor(for ratio: CGFloat) -> Color {
-        if ratio > 0.8 {
-            return WinampTheme.vizHigh
-        } else if ratio > 0.5 {
-            return WinampTheme.vizMid
-        } else {
-            return WinampTheme.vizLow
-        }
+    private func color(for seg: Int, of total: Int) -> Color {
+        let ratio = CGFloat(seg) / CGFloat(max(1, total - 1))
+        if ratio > 0.82 { return WinampTheme.vizPeak }
+        if ratio > 0.65 { return WinampTheme.vizHigh }
+        if ratio > 0.40 { return WinampTheme.vizMid }
+        return WinampTheme.vizLow
     }
 }

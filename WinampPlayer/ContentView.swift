@@ -1,182 +1,139 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var playerManager: AudioPlayerManager
-    @EnvironmentObject var libraryManager: MusicLibraryManager
+    @EnvironmentObject var player: AudioPlayerManager
+    @EnvironmentObject var library: MusicLibraryManager
 
     var body: some View {
-        #if os(iOS)
-        iOSMainView()
-        #else
-        macOSMainView()
-        #endif
+        WinampStackedView()
+            .onAppear {
+                if !library.needsFolderSelection {
+                    library.startScanning()
+                }
+            }
     }
 }
 
-// MARK: - iOS Layout
-struct iOSMainView: View {
-    @EnvironmentObject var playerManager: AudioPlayerManager
-    @EnvironmentObject var libraryManager: MusicLibraryManager
-    @State private var selectedTab: Int = 1  // Start on Library tab for first-time setup
+// MARK: - Classic stacked Winamp layout
+/// Pixel-faithful recreation of the Winamp 2.x window stack:
+///   ┌─────────────────────────┐
+///   │ WINAMP  (title bar)     │  ← 16pt
+///   │ LCD Display             │  ← ~56pt
+///   │ Seek bar                │  ← 10pt
+///   │ Transport|Vol|Bal|Togl  │  ← ~36pt
+///   ├─────────────────────────┤
+///   │ WINAMP EQUALIZER        │  ← collapsible
+///   ├─────────────────────────┤
+///   │ WINAMP PLAYLIST (tabs)  │
+///   │ track list …            │  ← fills remaining
+///   │ status bar              │
+///   └─────────────────────────┘
+struct WinampStackedView: View {
+    @EnvironmentObject var player: AudioPlayerManager
+    @EnvironmentObject var library: MusicLibraryManager
+    @State private var selectedTab: Int = 1
+    @State private var showEQ: Bool = true
+
+    // Classic Winamp main window is 275px; we scale to ~340–380pt
+    private let winampWidth: CGFloat = 360
 
     var body: some View {
         ZStack {
             WinampBackground()
 
+            #if os(iOS)
+            ScrollView(.vertical, showsIndicators: false) {
+                mainStack
+                    .frame(width: winampWidth)
+                    .frame(minHeight: 580)
+            }
+            .frame(maxWidth: .infinity)
+            #else
+            mainStack
+                .frame(minWidth: 340, idealWidth: winampWidth, minHeight: 480)
+            #endif
+        }
+        .onAppear {
+            if !library.needsFolderSelection { selectedTab = 0 }
+        }
+    }
+
+    private var mainStack: some View {
+        VStack(spacing: 0) {
+            // ═══════════════════════════════════════
+            //  1. MAIN PLAYER WINDOW
+            // ═══════════════════════════════════════
             VStack(spacing: 0) {
-                // Title Bar
-                WinampTitleBar(title: playerManager.currentTrack?.title ?? "WINAMP PLAYER")
+                // Title bar
+                WinampTitleBar(title: player.currentTrack?.formattedTitle ?? "WINAMP")
 
-                // Now Playing Display
+                // LCD display (black panel with time, viz, scrolling text)
                 WinampDisplay()
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 3)
+                    .padding(.top, 2)
 
-                // Visualization
-                AudioVisualizerView()
-                    .frame(height: 60)
-                    .padding(.horizontal, 8)
-
-                // Progress Bar
+                // Seek bar (thin position bar)
                 WinampSeekBar()
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 2)
 
-                // Transport Controls
-                WinampTransportControls()
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 8)
+                // Transport controls + volume + balance + toggles
+                WinampControlStrip()
+            }
+            .background(WinampTheme.frameBg)
+            .overlay(
+                Rectangle().strokeBorder(
+                    LinearGradient(
+                        colors: [WinampTheme.frameHighlight, WinampTheme.frameShadow],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+            )
 
-                // Volume
-                WinampVolumeControl()
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 4)
+            // ═══════════════════════════════════════
+            //  2. EQUALIZER (collapsible)
+            // ═══════════════════════════════════════
+            if showEQ {
+                WinampEqualizer()
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
 
-                // Tab Selector
+            // ═══════════════════════════════════════
+            //  3. PLAYLIST / LIBRARY / SEARCH
+            // ═══════════════════════════════════════
+            VStack(spacing: 0) {
+                // Section title bar
+                WinampTitleBar(title: "WINAMP PLAYLIST")
+
+                // Tab switcher
                 WinampTabBar(selectedTab: $selectedTab)
 
-                // Content Area
+                // Content
                 Group {
                     switch selectedTab {
-                    case 0:
-                        PlaylistView()
-                    case 1:
-                        LibraryBrowserView()
-                    case 2:
-                        SearchView()
-                    default:
-                        PlaylistView()
+                    case 0: PlaylistView()
+                    case 1: LibraryBrowserView()
+                    case 2: SearchView()
+                    default: PlaylistView()
                     }
                 }
-                .frame(maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                #if os(iOS)
+                .frame(minHeight: 200)
+                #endif
             }
-        }
-        .onAppear {
-            // If a folder is already saved, scan it; otherwise stay on Library tab
-            if !libraryManager.needsFolderSelection {
-                libraryManager.startScanning()
-                selectedTab = 0  // Switch to playlist if we already have a folder
-            }
-        }
-    }
-}
-
-// MARK: - macOS Layout
-struct macOSMainView: View {
-    @EnvironmentObject var playerManager: AudioPlayerManager
-    @EnvironmentObject var libraryManager: MusicLibraryManager
-
-    var body: some View {
-        ZStack {
-            WinampBackground()
-
-            VStack(spacing: 0) {
-                // Title Bar
-                WinampTitleBar(title: playerManager.currentTrack?.title ?? "WINAMP PLAYER")
-
-                HStack(spacing: 0) {
-                    // Left: Player Controls
-                    VStack(spacing: 0) {
-                        // Display
-                        WinampDisplay()
-                            .padding(8)
-
-                        // Visualization
-                        AudioVisualizerView()
-                            .frame(height: 80)
-                            .padding(.horizontal, 8)
-
-                        // Seek Bar
-                        WinampSeekBar()
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-
-                        // Transport Controls
-                        WinampTransportControls()
-                            .padding(8)
-
-                        // Volume + Extras
-                        HStack {
-                            WinampVolumeControl()
-                            Spacer()
-                            WinampShuffleRepeatControls()
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 8)
-
-                        Spacer()
-                    }
-                    .frame(width: 320)
-
-                    // Divider
-                    WinampDivider()
-
-                    // Right: Playlist / Library
-                    VStack(spacing: 0) {
-                        MacOSTabView()
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-        }
-        .onAppear {
-            // If a folder is already saved, scan it automatically
-            if !libraryManager.needsFolderSelection {
-                libraryManager.startScanning()
-            }
-        }
-    }
-}
-
-struct MacOSTabView: View {
-    @EnvironmentObject var libraryManager: MusicLibraryManager
-    // Start on Library tab if no folder is selected yet
-    @State private var selectedTab: Int = 1
-
-    private func initialTab() -> Int {
-        libraryManager.needsFolderSelection ? 1 : 0
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            WinampTabBar(selectedTab: $selectedTab)
-
-            Group {
-                switch selectedTab {
-                case 0:
-                    PlaylistView()
-                case 1:
-                    LibraryBrowserView()
-                case 2:
-                    SearchView()
-                default:
-                    PlaylistView()
-                }
-            }
+            .background(WinampTheme.frameBg)
+            .overlay(
+                Rectangle().strokeBorder(
+                    LinearGradient(
+                        colors: [WinampTheme.frameHighlight, WinampTheme.frameShadow],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+            )
             .frame(maxHeight: .infinity)
-        }
-        .onAppear {
-            selectedTab = initialTab()
         }
     }
 }

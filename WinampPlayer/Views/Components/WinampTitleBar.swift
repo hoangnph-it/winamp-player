@@ -1,96 +1,60 @@
 import SwiftUI
 
-/// Classic Winamp title bar with scrolling text
+/// Classic Winamp 2.x dark-blue gradient title bar (titlebar.bmp)
+/// Left: Winamp logo area / text, Right: minimize | shade | close buttons
 struct WinampTitleBar: View {
     let title: String
-    @State private var scrollOffset: CGFloat = 0
-    @State private var textWidth: CGFloat = 0
+    var isActive: Bool = true
 
     var body: some View {
         HStack(spacing: 0) {
-            // Winamp "logo" area
-            HStack(spacing: 4) {
-                // Classic Winamp bolt icon (simplified)
-                ZStack {
-                    Circle()
-                        .fill(WinampTheme.lcdGreenDim)
-                        .frame(width: 14, height: 14)
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 8))
-                        .foregroundColor(.black)
+            // Classic "grip" marks (left edge)
+            HStack(spacing: 1) {
+                ForEach(0..<4, id: \.self) { _ in
+                    Rectangle()
+                        .fill(WinampTheme.lcdGreenDim.opacity(0.5))
+                        .frame(width: 1, height: 8)
                 }
-
-                Text("WINAMP")
-                    .font(WinampTheme.titleFont)
-                    .foregroundColor(WinampTheme.lcdGreen)
             }
-            .padding(.leading, 8)
+            .padding(.leading, 4)
 
-            Spacer()
+            // Title text
+            Text(title)
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundColor(isActive ? .white : WinampTheme.btnText)
+                .lineLimit(1)
+                .padding(.leading, 4)
 
-            // Scrolling title
-            GeometryReader { geo in
-                let displayText = "  ***  \(title.uppercased())  ***  \(title.uppercased())  ***  "
+            Spacer(minLength: 4)
 
-                Text(displayText)
-                    .font(WinampTheme.titleFont)
-                    .foregroundColor(WinampTheme.lcdGreen)
-                    .fixedSize()
-                    .offset(x: -scrollOffset)
-                    .onAppear {
-                        startScrolling(width: geo.size.width)
-                    }
-                    .onChange(of: title) { _ in
-                        scrollOffset = 0
-                        startScrolling(width: geo.size.width)
-                    }
+            // Window buttons (minimize, shade, close) — decorative
+            HStack(spacing: 1) {
+                TitleBarBtn(icon: "minus")
+                TitleBarBtn(icon: "square")
+                TitleBarBtn(icon: "xmark")
             }
-            .frame(height: 16)
-            .clipped()
-            .padding(.horizontal, 8)
-
-            Spacer()
-
-            // Window controls placeholder
-            HStack(spacing: 4) {
-                WinampMiniButton(symbol: "minus")
-                WinampMiniButton(symbol: "square")
-                WinampMiniButton(symbol: "xmark")
-            }
-            .padding(.trailing, 8)
+            .padding(.trailing, 3)
         }
-        .frame(height: 28)
+        .frame(height: 16)
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.0, green: 0.0, blue: 0.35),
-                    Color(red: 0.0, green: 0.0, blue: 0.20)
-                ]),
-                startPoint: .leading,
-                endPoint: .trailing
+                colors: isActive
+                    ? [WinampTheme.titleBarLeft, WinampTheme.titleBarRight]
+                    : [WinampTheme.frameDark, WinampTheme.frameShadow],
+                startPoint: .leading, endPoint: .trailing
             )
         )
     }
-
-    private func startScrolling(width: CGFloat) {
-        withAnimation(
-            .linear(duration: 12)
-            .repeatForever(autoreverses: false)
-        ) {
-            scrollOffset = width + 200
-        }
-    }
 }
 
-struct WinampMiniButton: View {
-    let symbol: String
-
+private struct TitleBarBtn: View {
+    let icon: String
     var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 7, weight: .bold))
-            .foregroundColor(WinampTheme.buttonText)
-            .frame(width: 16, height: 14)
-            .background(WinampTheme.buttonFace)
-            .cornerRadius(2)
+        Image(systemName: icon)
+            .font(.system(size: 5, weight: .bold))
+            .foregroundColor(WinampTheme.btnText)
+            .frame(width: 10, height: 10)
+            .background(WinampTheme.btnFace)
+            .overlay(BevelBorder())
     }
 }

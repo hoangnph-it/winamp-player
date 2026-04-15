@@ -11,12 +11,12 @@ struct WinampPlayerApp: App {
                 .environmentObject(playerManager)
                 .environmentObject(libraryManager)
             #if os(macOS)
-                .frame(minWidth: 600, minHeight: 500)
+                .frame(minWidth: 340, minHeight: 560)
             #endif
         }
         #if os(macOS)
         .windowStyle(.titleBar)
-        .defaultSize(width: 800, height: 600)
+        .defaultSize(width: 370, height: 640)
         #endif
     }
 }

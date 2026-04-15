@@ -26,6 +26,7 @@
 		A10017 /* PlaylistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10017 /* PlaylistView.swift */; };
 		A10018 /* LibraryBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10018 /* LibraryBrowserView.swift */; };
 		A10019 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10019 /* SearchView.swift */; };
+		A10020 /* WinampEqualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10022 /* WinampEqualizer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -50,6 +51,7 @@
 		B10019 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		B10020 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10021 /* WinampPlayer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WinampPlayer.entitlements; sourceTree = "<group>"; };
+		B10022 /* WinampEqualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WinampEqualizer.swift; sourceTree = "<group>"; };
 		C10001 /* WinampPlayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WinampPlayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -126,6 +128,7 @@
 				B10014 /* WinampVolumeControl.swift */,
 				B10015 /* AudioVisualizerView.swift */,
 				B10016 /* WinampTabBar.swift */,
+				B10022 /* WinampEqualizer.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -238,6 +241,7 @@
 				A10017 /* PlaylistView.swift in Sources */,
 				A10018 /* LibraryBrowserView.swift in Sources */,
 				A10019 /* SearchView.swift in Sources */,
+				A10020 /* WinampEqualizer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

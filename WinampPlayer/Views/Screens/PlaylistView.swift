@@ -1,165 +1,134 @@
 import SwiftUI
 
-/// Classic Winamp playlist editor view
+/// Classic Winamp Playlist window — numbered green text, blue highlight, status bar
 struct PlaylistView: View {
-    @EnvironmentObject var playerManager: AudioPlayerManager
-    @EnvironmentObject var libraryManager: MusicLibraryManager
+    @EnvironmentObject var player: AudioPlayerManager
+    @EnvironmentObject var library: MusicLibraryManager
 
     var body: some View {
         VStack(spacing: 0) {
-            // Playlist header
-            HStack {
-                Text("PLAYLIST EDITOR")
-                    .font(WinampTheme.buttonFont)
-                    .foregroundColor(WinampTheme.lcdGreenDim)
-
-                Spacer()
-
-                Text("\(playerManager.playlist.tracks.count) TRACKS")
-                    .font(WinampTheme.buttonFont)
-                    .foregroundColor(WinampTheme.lcdGreenDim)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(WinampTheme.panelBackground)
-
-            // Track list
-            if playerManager.playlist.tracks.isEmpty {
-                VStack(spacing: 12) {
+            // ── Track list ──
+            if player.playlist.tracks.isEmpty {
+                // Empty state
+                VStack(spacing: 8) {
                     Spacer()
-                    Image(systemName: "music.note.list")
-                        .font(.system(size: 32))
-                        .foregroundColor(WinampTheme.lcdGreenDim)
-
                     Text("Playlist is empty")
+                        .font(WinampTheme.plFont)
+                        .foregroundColor(WinampTheme.plTextDim)
+                    Text("Add tracks from the LIBRARY tab")
                         .font(WinampTheme.infoFont)
-                        .foregroundColor(WinampTheme.lcdGreenDim)
+                        .foregroundColor(WinampTheme.plTextDim)
 
-                    Text("Add tracks from the Library tab")
-                        .font(WinampTheme.infoFont)
-                        .foregroundColor(WinampTheme.buttonText)
-
-                    // Quick add all button
-                    if !libraryManager.tracks.isEmpty {
-                        Button(action: {
-                            playerManager.addToPlaylist(libraryManager.tracks)
-                        }) {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                Text("ADD ALL (\(libraryManager.tracks.count) TRACKS)")
-                            }
+                    if !library.tracks.isEmpty {
+                        Button {
+                            player.addToPlaylist(library.tracks)
+                        } label: {
+                            Text("+ ADD ALL (\(library.tracks.count))")
                         }
                         .buttonStyle(WinampButtonStyle())
-                        .padding(.top, 8)
+                        .padding(.top, 4)
                     }
-
                     Spacer()
                 }
+                .frame(maxWidth: .infinity)
+                .background(WinampTheme.plBg)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(playerManager.playlist.tracks.enumerated()), id: \.element.id) { index, track in
-                            PlaylistRow(
-                                track: track,
-                                index: index,
-                                isCurrentTrack: playerManager.playlist.currentIndex == index && playerManager.playbackState != .stopped,
-                                isPlaying: playerManager.playlist.currentIndex == index && playerManager.playbackState == .playing
-                            )
-                            .onTapGesture {
-                                playerManager.playTrackAtIndex(index)
-                            }
-                            .contextMenu {
-                                Button("Remove from Playlist") {
-                                    playerManager.playlist.removeTrack(at: index)
-                                }
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(player.playlist.tracks.enumerated()), id: \.element.id) { idx, track in
+                                PLRow(track: track, index: idx,
+                                      isCurrent: player.playlist.currentIndex == idx && player.playbackState != .stopped,
+                                      isPlaying: player.playlist.currentIndex == idx && player.playbackState == .playing)
+                                    .id(idx)
+                                    .onTapGesture { player.playTrackAtIndex(idx) }
+                                    .contextMenu {
+                                        Button("Remove") { player.playlist.removeTrack(at: idx) }
+                                    }
                             }
                         }
                     }
+                    .background(WinampTheme.plBg)
                 }
-                .background(WinampTheme.displayBackground)
             }
 
-            // Playlist controls footer
-            HStack(spacing: 6) {
-                Button(action: {
-                    playerManager.addToPlaylist(libraryManager.tracks)
-                }) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 9))
-                        Text("ADD ALL")
-                    }
+            // ── Status bar ──
+            HStack(spacing: 0) {
+                // Manage buttons
+                HStack(spacing: 2) {
+                    PLBtn(label: "+ADD") { player.addToPlaylist(library.tracks) }
+                    PLBtn(label: "CLR") { player.clearPlaylist() }
                 }
-                .buttonStyle(WinampButtonStyle())
-
-                Button(action: {
-                    playerManager.clearPlaylist()
-                }) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 9))
-                        Text("CLEAR")
-                    }
-                }
-                .buttonStyle(WinampButtonStyle())
 
                 Spacer()
 
-                // Total duration
-                Text("TOTAL: \(playerManager.playlist.formattedTotalDuration)")
-                    .font(WinampTheme.buttonFont)
-                    .foregroundColor(WinampTheme.lcdGreenDim)
+                // Track count + total time
+                let count = player.playlist.tracks.count
+                Text("\(count) track\(count == 1 ? "" : "s")")
+                    .font(WinampTheme.badgeFont)
+                    .foregroundColor(WinampTheme.plTextDim)
+
+                Text("  \(player.playlist.formattedTotalDuration)")
+                    .font(WinampTheme.badgeFont)
+                    .foregroundColor(WinampTheme.plTextDim)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(WinampTheme.panelBackground)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 3)
+            .background(WinampTheme.frameBg)
+            .overlay(BevelBorder())
         }
     }
 }
 
-// MARK: - Playlist Row
-struct PlaylistRow: View {
+// MARK: - Playlist row
+private struct PLRow: View {
     let track: Track
     let index: Int
-    let isCurrentTrack: Bool
+    let isCurrent: Bool
     let isPlaying: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
-            // Track number / play indicator
-            ZStack {
-                if isPlaying {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 8))
-                        .foregroundColor(WinampTheme.playlistNowPlaying)
-                } else {
-                    Text("\(index + 1).")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(WinampTheme.playlistTextDim)
-                }
-            }
-            .frame(width: 28, alignment: .trailing)
+        HStack(spacing: 4) {
+            // Number
+            Text("\(index + 1).")
+                .font(WinampTheme.plFont)
+                .foregroundColor(isCurrent ? WinampTheme.plNowPlaying : WinampTheme.plTextDim)
+                .frame(width: 24, alignment: .trailing)
 
-            // Track title
+            // Artist - Title
             Text(track.formattedTitle)
-                .font(WinampTheme.playlistFont)
-                .foregroundColor(isCurrentTrack ? WinampTheme.playlistNowPlaying : WinampTheme.playlistText)
+                .font(WinampTheme.plFont)
+                .foregroundColor(isCurrent ? WinampTheme.plNowPlaying : WinampTheme.plText)
                 .lineLimit(1)
 
-            Spacer()
+            Spacer(minLength: 4)
 
             // Duration
             Text(track.formattedDuration)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(WinampTheme.playlistTextDim)
+                .font(WinampTheme.plFont)
+                .foregroundColor(WinampTheme.plTextDim)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            isCurrentTrack
-                ? WinampTheme.playlistSelected.opacity(0.6)
-                : Color.clear
-        )
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+        .background(isCurrent ? WinampTheme.plSelected : Color.clear)
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Tiny playlist button
+private struct PLBtn: View {
+    let label: String
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 7, weight: .bold, design: .monospaced))
+                .foregroundColor(WinampTheme.btnText)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(WinampTheme.btnFace)
+                .overlay(BevelBorder())
+        }
+        .buttonStyle(.plain)
     }
 }

@@ -2,273 +2,191 @@ import SwiftUI
 
 /// Browse music library from iCloud Drive or any user-selected folder
 struct LibraryBrowserView: View {
-    @EnvironmentObject var playerManager: AudioPlayerManager
-    @EnvironmentObject var libraryManager: MusicLibraryManager
+    @EnvironmentObject var player: AudioPlayerManager
+    @EnvironmentObject var library: MusicLibraryManager
     @State private var showFolderPicker = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header with folder picker
+            // Header
             HStack {
-                Text("MUSIC LIBRARY")
-                    .font(WinampTheme.buttonFont)
-                    .foregroundColor(WinampTheme.lcdGreenDim)
-
-                Spacer()
-
                 // Scan status
-                if libraryManager.isScanning {
+                if library.isScanning {
                     HStack(spacing: 4) {
                         ProgressView()
-                            .scaleEffect(0.6)
+                            .scaleEffect(0.5)
                             #if os(macOS)
                             .controlSize(.small)
                             #endif
-                        Text(libraryManager.scanProgress)
-                            .font(WinampTheme.buttonFont)
-                            .foregroundColor(WinampTheme.accentOrange)
+                        Text(library.scanProgress)
+                            .font(WinampTheme.badgeFont)
+                            .foregroundColor(WinampTheme.lcdYellow)
                     }
                 } else {
-                    Text(libraryManager.scanProgress)
-                        .font(WinampTheme.buttonFont)
-                        .foregroundColor(WinampTheme.lcdGreenDim)
+                    Text(library.scanProgress)
+                        .font(WinampTheme.badgeFont)
+                        .foregroundColor(WinampTheme.plTextDim)
                 }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(WinampTheme.panelBackground)
-
-            // Folder selection button
-            Button(action: { showFolderPicker = true }) {
-                HStack {
-                    Image(systemName: "folder.badge.gearshape")
-                        .font(.system(size: 11))
-                    Text(folderDisplayName)
-                        .lineLimit(1)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9))
-                }
-                .font(WinampTheme.buttonFont)
-                .foregroundColor(WinampTheme.buttonText)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(WinampTheme.buttonFace.opacity(0.5))
-            }
-            .buttonStyle(.plain)
-
-            // Track list or empty state
-            if libraryManager.needsFolderSelection || (libraryManager.tracks.isEmpty && !libraryManager.isScanning) {
-                // Onboarding / empty state
-                VStack(spacing: 12) {
-                    Spacer()
-
-                    Image(systemName: libraryManager.needsFolderSelection ? "icloud.and.arrow.down" : "music.note")
-                        .font(.system(size: 40))
-                        .foregroundColor(WinampTheme.lcdGreenDim)
-
-                    Text(libraryManager.needsFolderSelection
-                         ? "Select your music folder"
-                         : "No MP3 or WAV files found")
-                        .font(WinampTheme.infoFont)
-                        .foregroundColor(WinampTheme.lcdGreen)
-
-                    Text(libraryManager.needsFolderSelection
-                         ? "Pick a folder from iCloud Drive or your device\nthat contains MP3 or WAV files"
-                         : "Try selecting a different folder")
-                        .font(WinampTheme.infoFont)
-                        .foregroundColor(WinampTheme.buttonText)
-                        .multilineTextAlignment(.center)
-
-                    if libraryManager.needsFolderSelection {
-                        // Prominent iCloud folder button
-                        Button(action: { showFolderPicker = true }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "icloud")
-                                    .font(.system(size: 14))
-                                Text("OPEN ICLOUD DRIVE")
-                            }
-                            .font(WinampTheme.buttonFont)
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(WinampTheme.lcdGreen)
-                            .cornerRadius(4)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.top, 8)
-
-                        Text("Tip: In the picker, tap \"Browse\" and navigate\nto iCloud Drive to find your music")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundColor(WinampTheme.lcdGreenDim.opacity(0.6))
-                            .multilineTextAlignment(.center)
-                            .padding(.top, 4)
-                    } else {
-                        Button(action: { showFolderPicker = true }) {
-                            HStack {
-                                Image(systemName: "folder")
-                                Text("SELECT DIFFERENT FOLDER")
-                            }
-                        }
-                        .buttonStyle(WinampButtonStyle())
-                        .padding(.top, 8)
-                    }
-
-                    Spacer()
-                }
-                .padding()
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(libraryManager.tracks.enumerated()), id: \.element.id) { index, track in
-                            LibraryTrackRow(track: track, index: index)
-                                .onTapGesture {
-                                    // Add to playlist and play
-                                    if !playerManager.playlist.tracks.contains(where: { $0.fileURL == track.fileURL }) {
-                                        playerManager.addToPlaylist([track])
-                                    }
-                                    if let playIndex = playerManager.playlist.tracks.firstIndex(where: { $0.fileURL == track.fileURL }) {
-                                        playerManager.playTrackAtIndex(playIndex)
-                                    }
-                                }
-                                .contextMenu {
-                                    Button("Add to Playlist") {
-                                        playerManager.addToPlaylist([track])
-                                    }
-                                    Button("Play Now") {
-                                        playerManager.replacePlaylist(with: libraryManager.tracks, startIndex: index)
-                                    }
-                                }
-                        }
-                    }
-                }
-                .background(WinampTheme.displayBackground)
-            }
-
-            // Footer actions
-            HStack(spacing: 6) {
-                Button(action: {
-                    playerManager.replacePlaylist(with: libraryManager.tracks)
-                }) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 9))
-                        Text("PLAY ALL")
-                    }
-                }
-                .buttonStyle(WinampButtonStyle())
-                .disabled(libraryManager.tracks.isEmpty)
-
-                Button(action: {
-                    playerManager.addToPlaylist(libraryManager.tracks)
-                }) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 9))
-                        Text("ENQUEUE ALL")
-                    }
-                }
-                .buttonStyle(WinampButtonStyle())
-                .disabled(libraryManager.tracks.isEmpty)
 
                 Spacer()
 
-                // Change folder
-                Button(action: {
-                    libraryManager.clearSavedFolder()
-                    showFolderPicker = true
-                }) {
+                // Folder picker button
+                Button { showFolderPicker = true } label: {
                     HStack(spacing: 3) {
-                        Image(systemName: "folder.badge.plus")
+                        Image(systemName: "folder")
                             .font(.system(size: 9))
-                        Text("CHANGE")
-                    }
-                }
-                .buttonStyle(WinampButtonStyle())
-
-                Button(action: {
-                    libraryManager.startScanning()
-                }) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 9))
-                        Text("RESCAN")
+                        Text(folderDisplayName)
+                            .lineLimit(1)
                     }
                 }
                 .buttonStyle(WinampButtonStyle())
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(WinampTheme.panelBackground)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 3)
+            .background(WinampTheme.frameBg)
+
+            // Content
+            if library.needsFolderSelection || (library.tracks.isEmpty && !library.isScanning) {
+                // Onboarding / empty
+                VStack(spacing: 10) {
+                    Spacer()
+                    Image(systemName: library.needsFolderSelection ? "icloud.and.arrow.down" : "music.note")
+                        .font(.system(size: 30))
+                        .foregroundColor(WinampTheme.lcdGreenDim)
+
+                    Text(library.needsFolderSelection ? "Select your music folder" : "No MP3 or WAV files found")
+                        .font(WinampTheme.infoFont)
+                        .foregroundColor(WinampTheme.lcdGreen)
+
+                    Text(library.needsFolderSelection
+                         ? "Pick a folder from iCloud Drive\nor your device"
+                         : "Try a different folder")
+                        .font(WinampTheme.infoFont)
+                        .foregroundColor(WinampTheme.btnText)
+                        .multilineTextAlignment(.center)
+
+                    Button { showFolderPicker = true } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "icloud").font(.system(size: 11))
+                            Text("OPEN FOLDER")
+                        }
+                        .font(WinampTheme.btnFont)
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(WinampTheme.lcdGreen)
+                        .cornerRadius(3)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 4)
+
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .background(WinampTheme.plBg)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(library.tracks.enumerated()), id: \.element.id) { idx, track in
+                            LibRow(track: track, index: idx)
+                                .onTapGesture {
+                                    if !player.playlist.tracks.contains(where: { $0.fileURL == track.fileURL }) {
+                                        player.addToPlaylist([track])
+                                    }
+                                    if let pi = player.playlist.tracks.firstIndex(where: { $0.fileURL == track.fileURL }) {
+                                        player.playTrackAtIndex(pi)
+                                    }
+                                }
+                                .contextMenu {
+                                    Button("Add to Playlist") { player.addToPlaylist([track]) }
+                                    Button("Play All from Here") {
+                                        player.replacePlaylist(with: library.tracks, startIndex: idx)
+                                    }
+                                }
+                        }
+                    }
+                }
+                .background(WinampTheme.plBg)
+            }
+
+            // Footer
+            HStack(spacing: 2) {
+                FBtn(label: "PLAY ALL") { player.replacePlaylist(with: library.tracks) }
+                FBtn(label: "+ALL") { player.addToPlaylist(library.tracks) }
+                Spacer()
+                FBtn(label: "CHANGE") {
+                    library.clearSavedFolder()
+                    showFolderPicker = true
+                }
+                FBtn(label: "RESCAN") { library.startScanning() }
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 3)
+            .background(WinampTheme.frameBg)
+            .overlay(BevelBorder())
         }
         .fileImporter(
             isPresented: $showFolderPicker,
             allowedContentTypes: [.folder],
             allowsMultipleSelection: false
         ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first {
-                    // Start security-scoped access for scanning
-                    _ = url.startAccessingSecurityScopedResource()
-                    libraryManager.scanFolder(at: url)
-                }
-            case .failure(let error):
-                print("Folder selection failed: \(error)")
-                libraryManager.errorMessage = "Could not access the selected folder."
+            if case .success(let urls) = result, let url = urls.first {
+                _ = url.startAccessingSecurityScopedResource()
+                library.scanFolder(at: url)
             }
         }
     }
 
     private var folderDisplayName: String {
-        if let url = libraryManager.selectedFolderURL {
-            return url.lastPathComponent
-        }
-        return "No folder selected — tap to choose"
+        library.selectedFolderURL?.lastPathComponent ?? "Choose…"
     }
 }
 
-// MARK: - Library Track Row
-struct LibraryTrackRow: View {
-    let track: Track
-    let index: Int
-
+// MARK: - Library row
+private struct LibRow: View {
+    let track: Track; let index: Int
     var body: some View {
-        HStack(spacing: 8) {
-            // File format badge
+        HStack(spacing: 4) {
             Text(track.fileFormat.rawValue.uppercased())
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .foregroundColor(track.fileFormat == .mp3 ? WinampTheme.accentBlue : WinampTheme.accentOrange)
-                .frame(width: 28)
+                .font(WinampTheme.badgeFont)
+                .foregroundColor(track.fileFormat == .mp3 ? WinampTheme.lcdYellow : WinampTheme.lcdGreenDim)
+                .frame(width: 24)
 
-            // Track info
             VStack(alignment: .leading, spacing: 1) {
                 Text(track.title)
-                    .font(WinampTheme.playlistFont)
-                    .foregroundColor(WinampTheme.playlistText)
+                    .font(WinampTheme.plFont)
+                    .foregroundColor(WinampTheme.plText)
                     .lineLimit(1)
-
                 Text(track.artist)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(WinampTheme.playlistTextDim)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundColor(WinampTheme.plTextDim)
                     .lineLimit(1)
             }
-
-            Spacer()
-
-            // Duration
+            Spacer(minLength: 4)
             Text(track.formattedDuration)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(WinampTheme.playlistTextDim)
-
-            // Add button
-            Image(systemName: "plus.circle")
-                .font(.system(size: 14))
-                .foregroundColor(WinampTheme.lcdGreenDim)
+                .font(WinampTheme.plFont)
+                .foregroundColor(WinampTheme.plTextDim)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(index % 2 == 0 ? Color.clear : WinampTheme.panelBackground.opacity(0.3))
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+        .background(index % 2 == 0 ? Color.clear : WinampTheme.frameDark.opacity(0.3))
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Footer button
+private struct FBtn: View {
+    let label: String; let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 7, weight: .bold, design: .monospaced))
+                .foregroundColor(WinampTheme.btnText)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(WinampTheme.btnFace)
+                .overlay(BevelBorder())
+        }
+        .buttonStyle(.plain)
     }
 }

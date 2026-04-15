@@ -1,84 +1,80 @@
 import SwiftUI
 
-/// Winamp-style seek/progress bar
+/// Classic Winamp 2.x position bar (posbar.bmp)
+/// A thin groove with a small rectangular thumb that slides along it
 struct WinampSeekBar: View {
-    @EnvironmentObject var playerManager: AudioPlayerManager
-    @State private var isDragging = false
-    @State private var dragValue: Double = 0
+    @EnvironmentObject var player: AudioPlayerManager
+    @State private var dragging = false
+    @State private var dragPct: Double = 0
 
-    private var progress: Double {
-        guard playerManager.duration > 0 else { return 0 }
-        return isDragging ? dragValue : (playerManager.currentTime / playerManager.duration)
+    private var pct: Double {
+        guard player.duration > 0 else { return 0 }
+        return dragging ? dragPct : player.currentTime / player.duration
     }
 
     var body: some View {
-        VStack(spacing: 2) {
-            // Time labels
-            HStack {
-                Text(formatTime(playerManager.currentTime))
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                    .foregroundColor(WinampTheme.lcdGreenDim)
-                Spacer()
-                Text("-\(formatTime(max(0, playerManager.duration - playerManager.currentTime)))")
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                    .foregroundColor(WinampTheme.lcdGreenDim)
-            }
+        GeometryReader { g in
+            let w = g.size.width
+            let thumbW: CGFloat = 14
+            let thumbH: CGFloat = 8
+            let grooveH: CGFloat = 3
 
-            // Seek bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    // Track background
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(WinampTheme.displayBackground)
-                        .frame(height: 8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 2)
-                                .stroke(WinampTheme.displayBorder, lineWidth: 0.5)
-                        )
-
-                    // Progress fill
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    WinampTheme.lcdGreenDim,
-                                    WinampTheme.lcdGreen
-                                ]),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: max(0, geo.size.width * progress), height: 8)
-
-                    // Thumb
-                    Circle()
-                        .fill(WinampTheme.lcdGreen)
-                        .frame(width: 14, height: 14)
-                        .shadow(color: WinampTheme.lcdGreenDim.opacity(0.5), radius: 3)
-                        .offset(x: max(0, min(geo.size.width - 14, geo.size.width * progress - 7)))
-                }
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            isDragging = true
-                            let percentage = max(0, min(1, value.location.x / geo.size.width))
-                            dragValue = percentage
+            ZStack(alignment: .leading) {
+                // Groove (recessed look)
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(WinampTheme.sliderTrack)
+                    .frame(height: grooveH)
+                    .overlay(
+                        // Inner shadow for depth
+                        VStack(spacing: 0) {
+                            Rectangle().fill(WinampTheme.frameShadow).frame(height: 1)
+                            Spacer()
+                            Rectangle().fill(WinampTheme.frameHighlight.opacity(0.3)).frame(height: 1)
                         }
-                        .onEnded { value in
-                            let percentage = max(0, min(1, value.location.x / geo.size.width))
-                            playerManager.seekToPercentage(percentage)
-                            isDragging = false
+                        .frame(height: grooveH)
+                    )
+
+                // Filled portion
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(WinampTheme.sliderFill)
+                    .frame(width: max(0, w * pct), height: grooveH)
+
+                // Thumb (classic small rectangular knob)
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(WinampTheme.sliderThumb)
+                    .frame(width: thumbW, height: thumbH)
+                    .overlay(
+                        // Bevel on thumb
+                        ZStack {
+                            VStack(spacing: 0) {
+                                Rectangle().fill(WinampTheme.sliderThumbHighlight).frame(height: 1)
+                                Spacer()
+                                Rectangle().fill(WinampTheme.frameShadow).frame(height: 1)
+                            }
+                            HStack(spacing: 0) {
+                                Rectangle().fill(WinampTheme.sliderThumbHighlight).frame(width: 1)
+                                Spacer()
+                                Rectangle().fill(WinampTheme.frameShadow).frame(width: 1)
+                            }
                         }
-                )
+                    )
+                    .offset(x: max(0, min(w - thumbW, w * pct - thumbW / 2)))
             }
-            .frame(height: 14)
+            .frame(height: max(grooveH, thumbH))
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { v in
+                        dragging = true
+                        dragPct = max(0, min(1, v.location.x / w))
+                    }
+                    .onEnded { v in
+                        let p = max(0, min(1, v.location.x / w))
+                        player.seekToPercentage(p)
+                        dragging = false
+                    }
+            )
         }
-    }
-
-    private func formatTime(_ time: TimeInterval) -> String {
-        let minutes = Int(time) / 60
-        let seconds = Int(time) % 60
-        return String(format: "%d:%02d", minutes, seconds)
+        .frame(height: 10)
     }
 }

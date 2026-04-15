@@ -23,6 +23,8 @@ class AudioPlayerManager: ObservableObject {
     private var audioPlayer: AVAudioPlayer?
     private var timer: Timer?
     private var levelTimer: Timer?
+    /// The URL we currently hold a security-scoped access on (must be released on stop/next)
+    private var accessedURL: URL?
 
     // MARK: - Initialization
     init() {
@@ -66,10 +68,12 @@ class AudioPlayerManager: ObservableObject {
     func stop() {
         audioPlayer?.stop()
         audioPlayer?.currentTime = 0
+        audioPlayer = nil
         currentTime = 0
         playbackState = .stopped
         audioLevels = Array(repeating: 0, count: 20)
         stopTimers()
+        releaseSecurityAccess()
     }
 
     func togglePlayPause() {
@@ -152,11 +156,17 @@ class AudioPlayerManager: ObservableObject {
     // MARK: - Private Methods
 
     private func loadAndPlay(_ track: Track) {
-        stop()
+        stop()  // also releases any previous security-scoped access
 
         do {
-            // Access security-scoped resource for iCloud files
+            // Start security-scoped access and KEEP it alive while playing.
+            // AVAudioPlayer reads from the file throughout playback, so we
+            // must not call stopAccessingSecurityScopedResource() until we
+            // stop or switch tracks.
             let didStartAccess = track.fileURL.startAccessingSecurityScopedResource()
+            if didStartAccess {
+                accessedURL = track.fileURL
+            }
 
             audioPlayer = try AVAudioPlayer(contentsOf: track.fileURL)
             audioPlayer?.delegate = AudioPlayerDelegateHandler.shared
@@ -184,13 +194,19 @@ class AudioPlayerManager: ObservableObject {
             AudioPlayerDelegateHandler.shared.onFinish = { [weak self] in
                 self?.handleTrackFinished()
             }
-
-            if didStartAccess {
-                track.fileURL.stopAccessingSecurityScopedResource()
-            }
         } catch {
             print("Failed to play track: \(error.localizedDescription)")
+            // Release access if we failed to play
+            releaseSecurityAccess()
             playbackState = .stopped
+        }
+    }
+
+    /// Release the security-scoped resource we're currently holding
+    private func releaseSecurityAccess() {
+        if let url = accessedURL {
+            url.stopAccessingSecurityScopedResource()
+            accessedURL = nil
         }
     }
 

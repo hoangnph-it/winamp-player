@@ -2,166 +2,113 @@ import SwiftUI
 
 /// Search tracks in the music library
 struct SearchView: View {
-    @EnvironmentObject var playerManager: AudioPlayerManager
-    @EnvironmentObject var libraryManager: MusicLibraryManager
-    @State private var searchQuery: String = ""
+    @EnvironmentObject var player: AudioPlayerManager
+    @EnvironmentObject var library: MusicLibraryManager
+    @State private var query: String = ""
 
-    private var searchResults: [Track] {
-        libraryManager.searchTracks(query: searchQuery)
+    private var results: [Track] {
+        library.searchTracks(query: query)
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Search header
-            HStack {
-                Text("SEARCH")
-                    .font(WinampTheme.buttonFont)
-                    .foregroundColor(WinampTheme.lcdGreenDim)
-
-                Spacer()
-
-                if !searchQuery.isEmpty {
-                    Text("\(searchResults.count) RESULTS")
-                        .font(WinampTheme.buttonFont)
-                        .foregroundColor(WinampTheme.lcdGreenDim)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(WinampTheme.panelBackground)
-
             // Search field
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12))
+                    .font(.system(size: 10))
                     .foregroundColor(WinampTheme.lcdGreenDim)
 
-                TextField("Search tracks, artists, albums...", text: $searchQuery)
-                    .font(WinampTheme.playlistFont)
+                TextField("Search…", text: $query)
+                    .font(WinampTheme.plFont)
                     .foregroundColor(WinampTheme.lcdGreen)
                     #if os(iOS)
                     .autocapitalization(.none)
                     #endif
                     .disableAutocorrection(true)
 
-                if !searchQuery.isEmpty {
-                    Button(action: { searchQuery = "" }) {
+                if !query.isEmpty {
+                    Button { query = "" } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(WinampTheme.buttonText)
+                            .font(.system(size: 10))
+                            .foregroundColor(WinampTheme.btnText)
                     }
                     .buttonStyle(.plain)
+
+                    Text("\(results.count)")
+                        .font(WinampTheme.badgeFont)
+                        .foregroundColor(WinampTheme.lcdGreenDim)
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(WinampTheme.displayBackground)
-            .overlay(
-                Rectangle()
-                    .stroke(WinampTheme.displayBorder, lineWidth: 0.5)
-            )
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(WinampTheme.displayBg)
+            .overlay(Rectangle().stroke(WinampTheme.displayBorder, lineWidth: 0.5))
 
             // Results
-            if searchQuery.isEmpty {
-                VStack(spacing: 12) {
-                    Spacer()
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 32))
-                        .foregroundColor(WinampTheme.lcdGreenDim)
-
-                    Text("Search your music library")
-                        .font(WinampTheme.infoFont)
-                        .foregroundColor(WinampTheme.lcdGreenDim)
-
-                    Text("Type to search by title, artist, or album")
-                        .font(WinampTheme.infoFont)
-                        .foregroundColor(WinampTheme.buttonText)
-
-                    Spacer()
-                }
-            } else if searchResults.isEmpty {
+            if query.isEmpty {
                 VStack(spacing: 8) {
                     Spacer()
-                    Text("No results for \"\(searchQuery)\"")
+                    Text("Type to search by title, artist, or album")
                         .font(WinampTheme.infoFont)
-                        .foregroundColor(WinampTheme.lcdGreenDim)
+                        .foregroundColor(WinampTheme.plTextDim)
                     Spacer()
                 }
+                .frame(maxWidth: .infinity)
+                .background(WinampTheme.plBg)
+            } else if results.isEmpty {
+                VStack {
+                    Spacer()
+                    Text("No results for \"\(query)\"")
+                        .font(WinampTheme.infoFont)
+                        .foregroundColor(WinampTheme.plTextDim)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .background(WinampTheme.plBg)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(searchResults.enumerated()), id: \.element.id) { index, track in
-                            SearchResultRow(track: track, index: index, searchQuery: searchQuery)
+                        ForEach(Array(results.enumerated()), id: \.element.id) { idx, track in
+                            SRow(track: track, index: idx)
                                 .onTapGesture {
-                                    // Add to playlist and play
-                                    if !playerManager.playlist.tracks.contains(where: { $0.fileURL == track.fileURL }) {
-                                        playerManager.addToPlaylist([track])
+                                    if !player.playlist.tracks.contains(where: { $0.fileURL == track.fileURL }) {
+                                        player.addToPlaylist([track])
                                     }
-                                    if let playIndex = playerManager.playlist.tracks.firstIndex(where: { $0.fileURL == track.fileURL }) {
-                                        playerManager.playTrackAtIndex(playIndex)
+                                    if let pi = player.playlist.tracks.firstIndex(where: { $0.fileURL == track.fileURL }) {
+                                        player.playTrackAtIndex(pi)
                                     }
                                 }
                                 .contextMenu {
-                                    Button("Add to Playlist") {
-                                        playerManager.addToPlaylist([track])
-                                    }
-                                    Button("Play All Results") {
-                                        playerManager.replacePlaylist(with: searchResults)
-                                    }
+                                    Button("Add to Playlist") { player.addToPlaylist([track]) }
+                                    Button("Play All Results") { player.replacePlaylist(with: results) }
                                 }
                         }
                     }
                 }
-                .background(WinampTheme.displayBackground)
+                .background(WinampTheme.plBg)
             }
         }
     }
 }
 
-struct SearchResultRow: View {
-    let track: Track
-    let index: Int
-    let searchQuery: String
-
+private struct SRow: View {
+    let track: Track; let index: Int
     var body: some View {
-        HStack(spacing: 8) {
-            // Format badge
+        HStack(spacing: 4) {
             Text(track.fileFormat.rawValue.uppercased())
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .foregroundColor(track.fileFormat == .mp3 ? WinampTheme.accentBlue : WinampTheme.accentOrange)
-                .frame(width: 28)
-
-            // Track info
+                .font(WinampTheme.badgeFont)
+                .foregroundColor(WinampTheme.lcdYellow)
+                .frame(width: 24)
             VStack(alignment: .leading, spacing: 1) {
-                Text(track.title)
-                    .font(WinampTheme.playlistFont)
-                    .foregroundColor(WinampTheme.playlistText)
-                    .lineLimit(1)
-
-                HStack(spacing: 8) {
-                    Text(track.artist)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(WinampTheme.playlistTextDim)
-                        .lineLimit(1)
-
-                    if track.album != "Unknown Album" {
-                        Text("| \(track.album)")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundColor(WinampTheme.playlistTextDim)
-                            .lineLimit(1)
-                    }
-                }
+                Text(track.title).font(WinampTheme.plFont).foregroundColor(WinampTheme.plText).lineLimit(1)
+                Text(track.artist).font(.system(size: 9, design: .monospaced)).foregroundColor(WinampTheme.plTextDim).lineLimit(1)
             }
-
-            Spacer()
-
-            Text(track.formattedDuration)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(WinampTheme.playlistTextDim)
+            Spacer(minLength: 4)
+            Text(track.formattedDuration).font(WinampTheme.plFont).foregroundColor(WinampTheme.plTextDim)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(index % 2 == 0 ? Color.clear : WinampTheme.panelBackground.opacity(0.3))
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+        .background(index % 2 == 0 ? Color.clear : WinampTheme.frameDark.opacity(0.3))
         .contentShape(Rectangle())
     }
 }

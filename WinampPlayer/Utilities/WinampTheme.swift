@@ -1,100 +1,125 @@
 import SwiftUI
 
-/// Classic Winamp color scheme and styling
+/// Classic Winamp 2.x color scheme — pixel-accurate palette
 struct WinampTheme {
-    // MARK: - Colors (Classic Winamp palette)
-    static let background = Color(red: 0.14, green: 0.14, blue: 0.16)         // #232428 dark base
-    static let panelBackground = Color(red: 0.10, green: 0.10, blue: 0.12)    // #1A1A1E darker panel
-    static let displayBackground = Color(red: 0.0, green: 0.0, blue: 0.0)     // #000000 display
-    static let displayBorder = Color(red: 0.22, green: 0.22, blue: 0.25)      // #383840
+    // MARK: - Frame / Chrome
+    static let frameBg = Color(red: 0.22, green: 0.24, blue: 0.26)            // main window chrome
+    static let frameHighlight = Color(red: 0.33, green: 0.36, blue: 0.38)     // top/left bevel
+    static let frameShadow = Color(red: 0.10, green: 0.11, blue: 0.12)        // bottom/right bevel
+    static let frameDark = Color(red: 0.14, green: 0.15, blue: 0.17)          // recessed areas
 
-    // Green LCD text (classic Winamp)
+    // MARK: - Title bar (dark blue gradient)
+    static let titleBarLeft = Color(red: 0.0, green: 0.0, blue: 0.45)
+    static let titleBarRight = Color(red: 0.0, green: 0.0, blue: 0.22)
+
+    // MARK: - LCD Display
+    static let displayBg = Color(red: 0.0, green: 0.0, blue: 0.0)
+    static let displayBorder = Color(red: 0.10, green: 0.12, blue: 0.14)
+
+    // Green LCD text
     static let lcdGreen = Color(red: 0.0, green: 1.0, blue: 0.0)             // #00FF00
-    static let lcdGreenDim = Color(red: 0.0, green: 0.5, blue: 0.0)          // #008000
-    static let lcdGreenFaint = Color(red: 0.0, green: 0.25, blue: 0.0)       // #004000
+    static let lcdGreenDim = Color(red: 0.0, green: 0.55, blue: 0.0)         // dim labels
+    static let lcdGreenFaint = Color(red: 0.0, green: 0.20, blue: 0.0)       // ghost segments
+    static let lcdYellow = Color(red: 0.85, green: 0.85, blue: 0.0)          // khz / kbps
 
-    // Accent colors
-    static let accentBlue = Color(red: 0.3, green: 0.5, blue: 0.9)           // #4D80E6
-    static let accentOrange = Color(red: 0.9, green: 0.6, blue: 0.2)         // #E69933
-    static let accentRed = Color(red: 0.9, green: 0.2, blue: 0.2)            // #E63333
+    // MARK: - Visualization
+    static let vizLow = Color(red: 0.13, green: 0.70, blue: 0.13)
+    static let vizMid = Color(red: 0.75, green: 0.78, blue: 0.0)
+    static let vizHigh = Color(red: 0.85, green: 0.18, blue: 0.10)
+    static let vizPeak = Color(red: 1.0, green: 0.15, blue: 0.10)
 
-    // Visualization bar colors (gradient from green to yellow to red)
-    static let vizLow = Color(red: 0.0, green: 0.8, blue: 0.0)
-    static let vizMid = Color(red: 0.8, green: 0.8, blue: 0.0)
-    static let vizHigh = Color(red: 0.9, green: 0.2, blue: 0.1)
+    // MARK: - Buttons (beveled 3-D)
+    static let btnFace = Color(red: 0.28, green: 0.30, blue: 0.33)
+    static let btnHighlight = Color(red: 0.42, green: 0.44, blue: 0.47)
+    static let btnShadow = Color(red: 0.12, green: 0.13, blue: 0.15)
+    static let btnText = Color(red: 0.78, green: 0.80, blue: 0.82)
+    static let btnActive = Color(red: 0.0, green: 0.85, blue: 0.0)
 
-    // Button colors
-    static let buttonFace = Color(red: 0.25, green: 0.25, blue: 0.28)
-    static let buttonHighlight = Color(red: 0.35, green: 0.35, blue: 0.38)
-    static let buttonShadow = Color(red: 0.12, green: 0.12, blue: 0.14)
-    static let buttonText = Color(red: 0.75, green: 0.75, blue: 0.78)
+    // MARK: - Sliders
+    static let sliderTrack = Color(red: 0.08, green: 0.08, blue: 0.10)
+    static let sliderFill = Color(red: 0.22, green: 0.50, blue: 0.22)
+    static let sliderThumb = Color(red: 0.52, green: 0.54, blue: 0.56)
+    static let sliderThumbHighlight = Color(red: 0.66, green: 0.68, blue: 0.70)
 
-    // Playlist colors
-    static let playlistSelected = Color(red: 0.0, green: 0.0, blue: 0.5)
-    static let playlistText = Color(red: 0.0, green: 0.85, blue: 0.0)
-    static let playlistTextDim = Color(red: 0.0, green: 0.55, blue: 0.0)
-    static let playlistNowPlaying = Color(red: 1.0, green: 1.0, blue: 1.0)
+    // MARK: - Equalizer
+    static let eqSliderBg = Color(red: 0.08, green: 0.10, blue: 0.06)
+    static let eqGreen = Color(red: 0.30, green: 0.72, blue: 0.15)
+    static let eqYellow = Color(red: 0.82, green: 0.82, blue: 0.0)
+    static let eqRed = Color(red: 0.82, green: 0.20, blue: 0.10)
 
-    // Scrollbar
-    static let scrollbarTrack = Color(red: 0.08, green: 0.08, blue: 0.10)
-    static let scrollbarThumb = Color(red: 0.3, green: 0.3, blue: 0.33)
+    // MARK: - Playlist
+    static let plBg = Color(red: 0.0, green: 0.0, blue: 0.0)
+    static let plText = Color(red: 0.0, green: 0.85, blue: 0.0)
+    static let plTextDim = Color(red: 0.0, green: 0.50, blue: 0.0)
+    static let plSelected = Color(red: 0.0, green: 0.0, blue: 0.50)
+    static let plNowPlaying = Color.white
+    static let plHeaderBg = Color(red: 0.16, green: 0.05, blue: 0.05)
 
     // MARK: - Fonts
-    static let displayFont = Font.system(size: 28, weight: .bold, design: .monospaced)
-    static let infoFont = Font.system(size: 11, weight: .medium, design: .monospaced)
-    static let playlistFont = Font.system(size: 12, weight: .regular, design: .monospaced)
-    static let buttonFont = Font.system(size: 10, weight: .bold, design: .monospaced)
-    static let titleFont = Font.system(size: 11, weight: .bold, design: .monospaced)
-
-    // MARK: - Dimensions
-    static let cornerRadius: CGFloat = 2
-    static let buttonCornerRadius: CGFloat = 3
-    static let panelPadding: CGFloat = 4
-    static let borderWidth: CGFloat = 1
+    static let timeFont = Font.system(size: 32, weight: .bold, design: .monospaced)
+    static let infoFont = Font.system(size: 10, weight: .semibold, design: .monospaced)
+    static let plFont = Font.system(size: 11, weight: .regular, design: .monospaced)
+    static let btnFont = Font.system(size: 9, weight: .bold, design: .monospaced)
+    static let titleFont = Font.system(size: 10, weight: .bold, design: .monospaced)
+    static let badgeFont = Font.system(size: 8, weight: .heavy, design: .monospaced)
 }
 
-// MARK: - Winamp Button Style
+// MARK: - Classic beveled button (small)
 struct WinampButtonStyle: ButtonStyle {
-    var isActive: Bool = false
-
+    var isActive = false
     func makeBody(configuration: Configuration) -> some View {
+        let pressed = configuration.isPressed
         configuration.label
-            .font(WinampTheme.buttonFont)
-            .foregroundColor(isActive ? WinampTheme.lcdGreen : WinampTheme.buttonText)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: WinampTheme.buttonCornerRadius)
-                    .fill(configuration.isPressed ? WinampTheme.buttonShadow : WinampTheme.buttonFace)
-            )
+            .font(WinampTheme.btnFont)
+            .foregroundColor(isActive ? WinampTheme.btnActive : WinampTheme.btnText)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(pressed ? WinampTheme.btnShadow : WinampTheme.btnFace)
             .overlay(
-                RoundedRectangle(cornerRadius: WinampTheme.buttonCornerRadius)
-                    .stroke(
-                        configuration.isPressed ? WinampTheme.buttonShadow : WinampTheme.buttonHighlight,
-                        lineWidth: 1
-                    )
+                BevelBorder(pressed: pressed)
             )
     }
 }
 
-// MARK: - Winamp Transport Button Style (larger, for play/pause/stop)
-struct WinampTransportButtonStyle: ButtonStyle {
-    var isActive: Bool = false
-
+// MARK: - Transport button (prev / play / pause / stop / next)
+struct WinampTransportStyle: ButtonStyle {
+    var isActive = false
+    var width: CGFloat = 24
     func makeBody(configuration: Configuration) -> some View {
+        let pressed = configuration.isPressed
         configuration.label
-            .foregroundColor(isActive ? WinampTheme.lcdGreen : WinampTheme.buttonText)
-            .frame(width: 36, height: 28)
-            .background(
-                RoundedRectangle(cornerRadius: WinampTheme.buttonCornerRadius)
-                    .fill(configuration.isPressed ? WinampTheme.buttonShadow : WinampTheme.buttonFace)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: WinampTheme.buttonCornerRadius)
-                    .stroke(
-                        isActive ? WinampTheme.lcdGreenDim : WinampTheme.buttonHighlight,
-                        lineWidth: 1
-                    )
-            )
+            .foregroundColor(isActive ? WinampTheme.btnActive : WinampTheme.btnText)
+            .frame(width: width, height: 18)
+            .background(pressed ? WinampTheme.btnShadow : WinampTheme.btnFace)
+            .overlay(BevelBorder(pressed: pressed))
+    }
+}
+
+// MARK: - Bevel border helper (classic Win32 look)
+struct BevelBorder: View {
+    var pressed: Bool = false
+    var body: some View {
+        GeometryReader { g in
+            let w = g.size.width, h = g.size.height
+            Path { p in
+                // top edge
+                p.move(to: .zero)
+                p.addLine(to: CGPoint(x: w, y: 0))
+                // left edge
+                p.move(to: .zero)
+                p.addLine(to: CGPoint(x: 0, y: h))
+            }
+            .stroke(pressed ? WinampTheme.btnShadow : WinampTheme.btnHighlight, lineWidth: 1)
+
+            Path { p in
+                // bottom edge
+                p.move(to: CGPoint(x: 0, y: h))
+                p.addLine(to: CGPoint(x: w, y: h))
+                // right edge
+                p.move(to: CGPoint(x: w, y: 0))
+                p.addLine(to: CGPoint(x: w, y: h))
+            }
+            .stroke(pressed ? WinampTheme.btnHighlight : WinampTheme.btnShadow, lineWidth: 1)
+        }
     }
 }
