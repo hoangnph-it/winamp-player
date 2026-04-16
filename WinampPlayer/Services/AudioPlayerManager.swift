@@ -2,9 +2,13 @@ import Foundation
 import AVFoundation
 import Combine
 import SwiftUI
+#if os(iOS)
+import MediaPlayer
+import UIKit
+#endif
 
 /// Core audio player manager using AVFoundation
-/// Supports MP3 and WAV playback with full transport controls
+/// Supports MP3 and WAV playback with full transport controls + background audio
 class AudioPlayerManager: ObservableObject {
     // MARK: - Published State
     @Published var playbackState: PlaybackState = .stopped
@@ -30,18 +34,146 @@ class AudioPlayerManager: ObservableObject {
     init() {
         #if os(iOS)
         setupAudioSession()
+        setupRemoteCommandCenter()
+        setupInterruptionHandling()
         #endif
     }
+
+    // MARK: - Audio Session (iOS background)
 
     #if os(iOS)
     private func setupAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true)
+            // .playback allows audio to continue when the screen locks or the
+            // app is backgrounded. Bluetooth/AirPlay options enable AirPods +
+            // wireless speakers as output destinations.
+            try session.setCategory(
+                .playback,
+                mode: .default,
+                options: [.allowAirPlay, .allowBluetooth, .allowBluetoothA2DP]
+            )
+            try session.setActive(true, options: [])
         } catch {
-            print("Failed to set up audio session: \(error)")
+            print("⚠️ Failed to set up audio session: \(error.localizedDescription)")
         }
+    }
+
+    private func setupRemoteCommandCenter() {
+        // CRITICAL: iOS will only keep the app alive in the background if the
+        // remote command center has at least one enabled command AND the
+        // now-playing info center has been populated.
+        let cmd = MPRemoteCommandCenter.shared()
+
+        cmd.playCommand.isEnabled = true
+        cmd.playCommand.addTarget { [weak self] _ in
+            self?.play()
+            return .success
+        }
+
+        cmd.pauseCommand.isEnabled = true
+        cmd.pauseCommand.addTarget { [weak self] _ in
+            self?.pause()
+            return .success
+        }
+
+        cmd.togglePlayPauseCommand.isEnabled = true
+        cmd.togglePlayPauseCommand.addTarget { [weak self] _ in
+            self?.togglePlayPause()
+            return .success
+        }
+
+        cmd.nextTrackCommand.isEnabled = true
+        cmd.nextTrackCommand.addTarget { [weak self] _ in
+            self?.next()
+            return .success
+        }
+
+        cmd.previousTrackCommand.isEnabled = true
+        cmd.previousTrackCommand.addTarget { [weak self] _ in
+            self?.previous()
+            return .success
+        }
+
+        cmd.stopCommand.isEnabled = true
+        cmd.stopCommand.addTarget { [weak self] _ in
+            self?.stop()
+            return .success
+        }
+
+        // Scrubbing on the lock screen
+        cmd.changePlaybackPositionCommand.isEnabled = true
+        cmd.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let self = self,
+                  let positionEvent = event as? MPChangePlaybackPositionCommandEvent else {
+                return .commandFailed
+            }
+            self.seek(to: positionEvent.positionTime)
+            return .success
+        }
+    }
+
+    private func setupInterruptionHandling() {
+        let nc = NotificationCenter.default
+        nc.addObserver(
+            self,
+            selector: #selector(handleInterruption(_:)),
+            name: AVAudioSession.interruptionNotification,
+            object: nil
+        )
+        nc.addObserver(
+            self,
+            selector: #selector(handleRouteChange(_:)),
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleInterruption(_ note: Notification) {
+        guard let info = note.userInfo,
+              let typeRaw = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeRaw) else { return }
+
+        switch type {
+        case .began:
+            // A call or another audio app started — pause playback
+            if playbackState == .playing { pause() }
+        case .ended:
+            // Optionally resume if the system says we should
+            if let optionsRaw = info[AVAudioSessionInterruptionOptionKey] as? UInt {
+                let opts = AVAudioSession.InterruptionOptions(rawValue: optionsRaw)
+                if opts.contains(.shouldResume), playbackState == .paused {
+                    play()
+                }
+            }
+        @unknown default: break
+        }
+    }
+
+    @objc private func handleRouteChange(_ note: Notification) {
+        // E.g. headphones unplugged → pause (the iOS convention)
+        guard let info = note.userInfo,
+              let reasonRaw = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonRaw) else { return }
+
+        if reason == .oldDeviceUnavailable, playbackState == .playing {
+            pause()
+        }
+    }
+
+    private func updateNowPlayingInfo() {
+        var info: [String: Any] = [:]
+        if let track = currentTrack {
+            info[MPMediaItemPropertyTitle] = track.title
+            info[MPMediaItemPropertyArtist] = track.artist
+            info[MPMediaItemPropertyAlbumTitle] = track.album
+        } else {
+            info[MPMediaItemPropertyTitle] = "Winamp Player"
+        }
+        info[MPMediaItemPropertyPlaybackDuration] = duration
+        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
+        info[MPNowPlayingInfoPropertyPlaybackRate] = (playbackState == .playing) ? 1.0 : 0.0
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
     #endif
 
@@ -50,10 +182,13 @@ class AudioPlayerManager: ObservableObject {
     func play(track: Track? = nil) {
         if let track = track {
             loadAndPlay(track)
-        } else if let currentTrack = currentTrack, playbackState == .paused {
+        } else if let _ = currentTrack, playbackState == .paused {
             audioPlayer?.play()
             playbackState = .playing
             startTimers()
+            #if os(iOS)
+            updateNowPlayingInfo()
+            #endif
         } else if let firstTrack = playlist.currentTrack {
             loadAndPlay(firstTrack)
         }
@@ -63,6 +198,9 @@ class AudioPlayerManager: ObservableObject {
         audioPlayer?.pause()
         playbackState = .paused
         stopTimers()
+        #if os(iOS)
+        updateNowPlayingInfo()
+        #endif
     }
 
     func stop() {
@@ -74,6 +212,9 @@ class AudioPlayerManager: ObservableObject {
         audioLevels = Array(repeating: 0, count: 20)
         stopTimers()
         releaseSecurityAccess()
+        #if os(iOS)
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        #endif
     }
 
     func togglePlayPause() {
@@ -105,6 +246,9 @@ class AudioPlayerManager: ObservableObject {
     func seek(to time: TimeInterval) {
         audioPlayer?.currentTime = time
         currentTime = time
+        #if os(iOS)
+        updateNowPlayingInfo()
+        #endif
     }
 
     func seekToPercentage(_ percentage: Double) {
@@ -158,6 +302,15 @@ class AudioPlayerManager: ObservableObject {
     private func loadAndPlay(_ track: Track) {
         stop()  // also releases any previous security-scoped access
 
+        #if os(iOS)
+        // Re-activate the audio session in case it was deactivated
+        do {
+            try AVAudioSession.sharedInstance().setActive(true, options: [])
+        } catch {
+            print("⚠️ Could not activate audio session: \(error.localizedDescription)")
+        }
+        #endif
+
         do {
             // Start security-scoped access and KEEP it alive while playing.
             // AVAudioPlayer reads from the file throughout playback, so we
@@ -189,6 +342,10 @@ class AudioPlayerManager: ObservableObject {
             audioPlayer?.play()
             playbackState = .playing
             startTimers()
+
+            #if os(iOS)
+            updateNowPlayingInfo()
+            #endif
 
             // Set up completion handler
             AudioPlayerDelegateHandler.shared.onFinish = { [weak self] in
@@ -237,6 +394,8 @@ class AudioPlayerManager: ObservableObject {
                 self.currentTime = player.currentTime
             }
         }
+        // Add to common run loop so it fires while UI is tracking gestures
+        if let t = timer { RunLoop.main.add(t, forMode: .common) }
 
         levelTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             guard let self = self, let player = self.audioPlayer else { return }
@@ -257,6 +416,7 @@ class AudioPlayerManager: ObservableObject {
                 self.audioLevels = levels
             }
         }
+        if let t = levelTimer { RunLoop.main.add(t, forMode: .common) }
     }
 
     private func stopTimers() {
