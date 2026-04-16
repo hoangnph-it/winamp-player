@@ -1,15 +1,15 @@
 import SwiftUI
 
-/// Classic Winamp 2.x control strip — pixel-accurate layout:
-/// Row 1: [Prev][Play][Pause][Stop][Next]  |  [graduated volume]  [balance]
-/// Row 2: [EQ][PL]  [SHUF][REP]
+/// Classic Winamp 2.x control strip — pixel-accurate layout matching reference:
+/// Row 1: [Prev][Play][Pause][Stop][Next][Eject]  [EQ][PL]
+/// Row 2: [graduated volume]  [balance]  [SHUFFLE][repeat][⚡]
 struct WinampControlStrip: View {
     @EnvironmentObject var player: AudioPlayerManager
     @State private var balance: Float = 0.5  // 0=left, 0.5=center, 1=right
 
     var body: some View {
         VStack(spacing: 2) {
-            // ── Row 1: Transport + Volume + Balance ──
+            // ── Row 1: Transport buttons + EQ/PL toggles ──
             HStack(spacing: 0) {
                 // Transport buttons (cbuttons.bmp style)
                 HStack(spacing: 1) {
@@ -24,8 +24,18 @@ struct WinampControlStrip: View {
                     }
                 }
 
-                Spacer(minLength: 6)
+                Spacer()
 
+                // EQ and PL toggle buttons (right side of transport row)
+                HStack(spacing: 2) {
+                    SmallToggle(label: "EQ", active: true) { }
+                    SmallToggle(label: "PL", active: true) { }
+                }
+            }
+            .padding(.horizontal, 6)
+
+            // ── Row 2: Volume + Balance + Shuffle/Repeat/Lightning ──
+            HStack(spacing: 0) {
                 // Graduated volume bars (volume.bmp style)
                 GraduatedVolume(value: Binding(
                     get: { player.volume },
@@ -33,33 +43,32 @@ struct WinampControlStrip: View {
                 ))
                 .frame(width: 72, height: 14)
 
-                Spacer(minLength: 6)
+                Spacer(minLength: 4)
 
                 // Balance slider (smaller graduated bars)
                 GraduatedBalance(value: $balance)
                     .frame(width: 42, height: 14)
-            }
-            .padding(.horizontal, 6)
 
-            // ── Row 2: EQ/PL toggles + Shuffle/Repeat ──
-            HStack(spacing: 0) {
-                // EQ and PL toggle buttons (shufrep.bmp area)
-                HStack(spacing: 2) {
-                    SmallToggle(label: "EQ", active: true) { }
-                    SmallToggle(label: "PL", active: true) { }
+                Spacer(minLength: 6)
+
+                // Shuffle button (larger bordered text button like original)
+                ShuffleButton(active: player.isShuffleEnabled) {
+                    player.toggleShuffle()
                 }
 
-                Spacer()
+                Spacer(minLength: 4)
 
-                // Shuffle and Repeat
-                HStack(spacing: 2) {
-                    SmallToggle(label: "S", active: player.isShuffleEnabled) {
-                        player.toggleShuffle()
-                    }
-                    SmallToggle(label: "R", active: player.repeatMode != .off) {
-                        player.cycleRepeatMode()
-                    }
+                // Repeat button
+                SmallToggle(label: "R", active: player.repeatMode != .off) {
+                    player.cycleRepeatMode()
                 }
+
+                Spacer(minLength: 4)
+
+                // Lightning bolt icon (classic Winamp decoration)
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(Color(red: 0.85, green: 0.65, blue: 0.0))
             }
             .padding(.horizontal, 6)
         }
@@ -187,7 +196,7 @@ private struct GraduatedBalance: View {
     }
 }
 
-// MARK: - Small Toggle Button (EQ/PL/S/R)
+// MARK: - Small Toggle Button (EQ/PL/R)
 private struct SmallToggle: View {
     let label: String
     let active: Bool
@@ -199,6 +208,26 @@ private struct SmallToggle: View {
                 .font(.system(size: 8, weight: .heavy, design: .monospaced))
                 .foregroundColor(active ? WinampTheme.btnActive : WinampTheme.btnText)
                 .frame(width: 22, height: 14)
+                .background(active ? WinampTheme.frameDark : WinampTheme.btnFace)
+                .overlay(BevelBorder(pressed: active))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Shuffle Button (larger bordered text, like original Winamp)
+private struct ShuffleButton: View {
+    let active: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text("SHUFFLE")
+                .font(.system(size: 7, weight: .heavy, design: .monospaced))
+                .foregroundColor(active ? WinampTheme.btnActive : WinampTheme.btnText)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .frame(height: 14)
                 .background(active ? WinampTheme.frameDark : WinampTheme.btnFace)
                 .overlay(BevelBorder(pressed: active))
         }

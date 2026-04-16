@@ -52,26 +52,38 @@ struct WinampDisplay: View {
             }
             .padding(.top, 4)
 
-            // ── Bottom info row: kbps | kHz | mono/stereo ──
+            // ── Bottom info row: kbps | kHz | mono/stereo | mini bars ──
             HStack(spacing: 0) {
-                // Bitrate
-                HStack(spacing: 1) {
+                // Bitrate (boxed like original)
+                HStack(spacing: 2) {
                     Text(player.currentTrack != nil ? "128" : "---")
                         .font(.system(size: 8, weight: .heavy, design: .monospaced))
                         .foregroundColor(WinampTheme.lcdGreen)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 1)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 1)
+                                .stroke(WinampTheme.lcdGreenDim.opacity(0.4), lineWidth: 0.5)
+                        )
                     Text("kbps")
                         .font(.system(size: 7, weight: .medium, design: .monospaced))
                         .foregroundColor(WinampTheme.lcdGreenDim)
                 }
                 .padding(.leading, 6)
 
-                Spacer().frame(width: 10)
+                Spacer().frame(width: 8)
 
-                // Sample rate
-                HStack(spacing: 1) {
+                // Sample rate (boxed like original)
+                HStack(spacing: 2) {
                     Text(player.sampleRate > 0 ? "\(player.sampleRate / 1000)" : "--")
                         .font(.system(size: 8, weight: .heavy, design: .monospaced))
                         .foregroundColor(WinampTheme.lcdGreen)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 1)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 1)
+                                .stroke(WinampTheme.lcdGreenDim.opacity(0.4), lineWidth: 0.5)
+                        )
                     Text("kHz")
                         .font(.system(size: 7, weight: .medium, design: .monospaced))
                         .foregroundColor(WinampTheme.lcdGreenDim)
@@ -80,13 +92,46 @@ struct WinampDisplay: View {
                 Spacer()
 
                 // Mono / Stereo indicators
-                HStack(spacing: 4) {
-                    MonoStereoIndicator(label: "MONO", active: false)
-                    MonoStereoIndicator(label: "STEREO", active: player.currentTrack != nil)
+                HStack(spacing: 6) {
+                    MonoStereoIndicator(label: "mono", active: false)
+                    MonoStereoIndicator(label: "stereo", active: player.currentTrack != nil)
+                }
+
+                Spacer().frame(width: 6)
+
+                // Small level bars (like original Winamp display)
+                HStack(alignment: .bottom, spacing: 1) {
+                    ForEach(0..<4, id: \.self) { i in
+                        let barH: CGFloat = CGFloat(3 + i * 2)
+                        Rectangle()
+                            .fill(i < 3 ? WinampTheme.lcdGreen : WinampTheme.lcdGreenDim)
+                            .frame(width: 2, height: barH)
+                    }
                 }
                 .padding(.trailing, 6)
             }
             .padding(.vertical, 3)
+
+            // ── Volume level indicator bar (red/green bar in original) ──
+            HStack(spacing: 0) {
+                // Level bar (changes color based on volume)
+                GeometryReader { g in
+                    let w = g.size.width
+                    let level = CGFloat(player.volume)
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(WinampTheme.lcdGreenFaint.opacity(0.3))
+                        Rectangle()
+                            .fill(level > 0.75
+                                  ? Color(red: 0.85, green: 0.15, blue: 0.10)
+                                  : WinampTheme.eqGreen)
+                            .frame(width: w * level)
+                    }
+                }
+                .frame(height: 3)
+                .padding(.horizontal, 6)
+            }
+            .padding(.bottom, 3)
         }
         .background(WinampTheme.displayBg)
         .overlay(
@@ -312,7 +357,7 @@ private struct MonoStereoIndicator: View {
 
     var body: some View {
         Text(label)
-            .font(.system(size: 7, weight: .heavy, design: .monospaced))
+            .font(.system(size: 8, weight: .bold, design: .monospaced))
             .foregroundColor(active ? WinampTheme.lcdGreen : WinampTheme.lcdGreenFaint)
     }
 }
