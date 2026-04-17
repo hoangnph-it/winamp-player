@@ -11,12 +11,14 @@ struct WinampPlayerApp: App {
                 .environmentObject(playerManager)
                 .environmentObject(libraryManager)
             #if os(macOS)
-                .frame(minWidth: 340, minHeight: 560)
+                // Matches the reference video: 3 floating windows laid out
+                // with Main + EQ on the left column and Playlist on the right.
+                .frame(minWidth: 680, minHeight: 380)
             #endif
         }
         #if os(macOS)
         .windowStyle(.titleBar)
-        .defaultSize(width: 370, height: 640)
+        .defaultSize(width: 700, height: 440)
         #endif
     }
 }

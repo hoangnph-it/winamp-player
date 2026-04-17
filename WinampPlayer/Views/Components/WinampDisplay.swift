@@ -1,138 +1,42 @@
 import SwiftUI
 
-/// Classic Winamp 2.x LCD display panel — pixel-accurate layout
-/// ┌──────────────────────────────────────────┐
-/// │ ▶ │  3:42  │ ▌▌▌▌▌▌▌▌ │                │
-/// │   │        │ (mini viz)│                │
-/// │   │────────│───────────│ scrolling text  │
-/// │   │ kbps kHz  stereo   │                │
-/// └──────────────────────────────────────────┘
+/// Classic Winamp 2.x LCD display — matching the reference video layout:
+///
+///  ┌──────────────────────────────────────────────────────────────┐
+///  │ ┌──────────┐ │ ▸ Scrolling title (ticker)         1/113      │
+///  │ │ ▸  0:00  │ │ ──────────────────────────────────────────    │
+///  │ │          │ │ 128 kbps   44 kHz          mono   stereo      │
+///  │ │  ▌▌▌▌▌▌  │ │ ──────────────────────────────────────────    │
+///  │ │ (mini-viz│ │ [========vol========]  [bal]   [EQ] [PL]      │
+///  │ └──────────┘ │                                               │
+///  └──────────────────────────────────────────────────────────────┘
+///
+/// Left column = "Playbar": play-status + 7-seg time + mini visualizer.
+/// Right column = 3 stacked info rows.
 struct WinampDisplay: View {
     @EnvironmentObject var player: AudioPlayerManager
-    @State private var titleOffset: CGFloat = 0
     @State private var scrollID = UUID()
+    @State private var balance: Float = 0.5
+    @State private var eqOn: Bool = true
+    @State private var plOn: Bool = true
 
     var body: some View {
-        VStack(spacing: 0) {
-            // ── Main area: status | time | viz | scroller ──
-            HStack(spacing: 0) {
-                // Play/Pause/Stop status indicator
-                PlayStatusIndicator(state: player.playbackState)
-                    .frame(width: 18, height: 36)
-                    .padding(.leading, 4)
+        HStack(spacing: 4) {
+            // ── LEFT: "Playbar" column ───────────────────────────
+            Playbar()
+                .frame(width: 85)
 
-                // Big segmented LCD time
-                SegmentedTime(time: player.currentTime)
-                    .frame(height: 36)
-                    .padding(.leading, 2)
-
-                // Mini spectrum visualizer
-                MiniViz(levels: player.audioLevels)
-                    .frame(width: 38, height: 36)
-                    .padding(.horizontal, 4)
-
-                // Right side: scrolling text + info
-                VStack(alignment: .leading, spacing: 1) {
-                    // Scrolling track title (ticker)
-                    ScrollingTicker(
-                        text: tickerText,
-                        scrollID: scrollID
-                    )
-                    .frame(height: 12)
-
-                    // Track # of total
-                    let idx = player.playlist.currentIndex + 1
-                    let total = max(player.playlist.tracks.count, 1)
-                    Text("\(idx)/\(total)")
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .foregroundColor(WinampTheme.lcdGreenDim)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, 4)
+            // ── RIGHT: 3-row info stack ──────────────────────────
+            VStack(spacing: 1) {
+                titleRow
+                infoRow
+                controlsRow
             }
-            .padding(.top, 4)
-
-            // ── Bottom info row: kbps | kHz | mono/stereo | mini bars ──
-            HStack(spacing: 0) {
-                // Bitrate (boxed like original)
-                HStack(spacing: 2) {
-                    Text(player.currentTrack != nil ? "128" : "---")
-                        .font(.system(size: 8, weight: .heavy, design: .monospaced))
-                        .foregroundColor(WinampTheme.lcdGreen)
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 1)
-                                .stroke(WinampTheme.lcdGreenDim.opacity(0.4), lineWidth: 0.5)
-                        )
-                    Text("kbps")
-                        .font(.system(size: 7, weight: .medium, design: .monospaced))
-                        .foregroundColor(WinampTheme.lcdGreenDim)
-                }
-                .padding(.leading, 6)
-
-                Spacer().frame(width: 8)
-
-                // Sample rate (boxed like original)
-                HStack(spacing: 2) {
-                    Text(player.sampleRate > 0 ? "\(player.sampleRate / 1000)" : "--")
-                        .font(.system(size: 8, weight: .heavy, design: .monospaced))
-                        .foregroundColor(WinampTheme.lcdGreen)
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 1)
-                                .stroke(WinampTheme.lcdGreenDim.opacity(0.4), lineWidth: 0.5)
-                        )
-                    Text("kHz")
-                        .font(.system(size: 7, weight: .medium, design: .monospaced))
-                        .foregroundColor(WinampTheme.lcdGreenDim)
-                }
-
-                Spacer()
-
-                // Mono / Stereo indicators
-                HStack(spacing: 6) {
-                    MonoStereoIndicator(label: "mono", active: false)
-                    MonoStereoIndicator(label: "stereo", active: player.currentTrack != nil)
-                }
-
-                Spacer().frame(width: 6)
-
-                // Small level bars (like original Winamp display)
-                HStack(alignment: .bottom, spacing: 1) {
-                    ForEach(0..<4, id: \.self) { i in
-                        let barH: CGFloat = CGFloat(3 + i * 2)
-                        Rectangle()
-                            .fill(i < 3 ? WinampTheme.lcdGreen : WinampTheme.lcdGreenDim)
-                            .frame(width: 2, height: barH)
-                    }
-                }
-                .padding(.trailing, 6)
-            }
-            .padding(.vertical, 3)
-
-            // ── Volume level indicator bar (red/green bar in original) ──
-            HStack(spacing: 0) {
-                // Level bar (changes color based on volume)
-                GeometryReader { g in
-                    let w = g.size.width
-                    let level = CGFloat(player.volume)
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(WinampTheme.lcdGreenFaint.opacity(0.3))
-                        Rectangle()
-                            .fill(level > 0.75
-                                  ? Color(red: 0.85, green: 0.15, blue: 0.10)
-                                  : WinampTheme.eqGreen)
-                            .frame(width: w * level)
-                    }
-                }
-                .frame(height: 3)
-                .padding(.horizontal, 6)
-            }
-            .padding(.bottom, 3)
+            .frame(maxWidth: .infinity, alignment: .top)
+            .padding(.trailing, 4)
         }
+        .padding(.vertical, 2)
+        .padding(.horizontal, 3)
         .background(WinampTheme.displayBg)
         .overlay(
             RoundedRectangle(cornerRadius: 1)
@@ -143,6 +47,91 @@ struct WinampDisplay: View {
         }
     }
 
+    // MARK: Right column — row 1: scrolling title + track index
+    private var titleRow: some View {
+        HStack(spacing: 4) {
+            // Bordered ticker box — classic Winamp framed song-title area
+            ScrollingTicker(text: tickerText, scrollID: scrollID)
+                .frame(height: 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 3)
+                .background(WinampTheme.displayBg)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 1)
+                        .strokeBorder(WinampTheme.displayBorder.opacity(0.8),
+                                      lineWidth: 0.5)
+                )
+
+            let idx = player.playlist.currentIndex + 1
+            let total = max(player.playlist.tracks.count, 1)
+            Text("\(idx)/\(total)")
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .foregroundColor(WinampTheme.lcdGreenDim)
+        }
+        .frame(height: 12)
+    }
+
+    // MARK: Right column — row 2: kbps | kHz | mono | stereo
+    private var infoRow: some View {
+        HStack(spacing: 0) {
+            // Bitrate
+            HStack(spacing: 2) {
+                Text(player.bitrate > 0 ? "\(player.bitrate)" : (player.currentTrack != nil ? "128" : "---"))
+                    .font(.system(size: 8, weight: .heavy, design: .monospaced))
+                    .foregroundColor(WinampTheme.lcdGreen)
+                    .frame(minWidth: 18, alignment: .trailing)
+                Text("kbps")
+                    .font(.system(size: 7, weight: .semibold, design: .monospaced))
+                    .foregroundColor(WinampTheme.lcdGreenDim)
+            }
+
+            Spacer().frame(width: 10)
+
+            // Sample rate
+            HStack(spacing: 2) {
+                Text(player.sampleRate > 0 ? "\(player.sampleRate / 1000)" : "--")
+                    .font(.system(size: 8, weight: .heavy, design: .monospaced))
+                    .foregroundColor(WinampTheme.lcdGreen)
+                    .frame(minWidth: 14, alignment: .trailing)
+                Text("kHz")
+                    .font(.system(size: 7, weight: .semibold, design: .monospaced))
+                    .foregroundColor(WinampTheme.lcdGreenDim)
+            }
+
+            Spacer()
+
+            // Mono / Stereo indicators
+            HStack(spacing: 8) {
+                MonoStereoIndicator(label: "mono", active: false)
+                MonoStereoIndicator(label: "stereo", active: player.currentTrack != nil)
+            }
+        }
+        .frame(height: 12)
+    }
+
+    // MARK: Right column — row 3: volume slider | balance | EQ | PL
+    private var controlsRow: some View {
+        HStack(spacing: 4) {
+            // Volume bar (graduated)
+            GraduatedVolume(value: Binding(
+                get: { player.volume },
+                set: { player.setVolume($0) }
+            ))
+            .frame(height: 12)
+            .frame(maxWidth: .infinity)
+
+            // Balance bar
+            GraduatedBalance(value: $balance)
+                .frame(width: 42, height: 12)
+
+            // EQ button
+            DisplayToggleBtn(label: "EQ", active: $eqOn)
+            // PL button
+            DisplayToggleBtn(label: "PL", active: $plOn)
+        }
+        .frame(height: 14)
+    }
+
     private var tickerText: String {
         if let track = player.currentTrack {
             return "\(track.artist) - \(track.title)"
@@ -151,19 +140,55 @@ struct WinampDisplay: View {
     }
 }
 
-// MARK: - Play/Pause/Stop Status Indicator (like playpaus.bmp)
+// MARK: - Playbar (the LCD group on the left)
+private struct Playbar: View {
+    @EnvironmentObject var player: AudioPlayerManager
+
+    var body: some View {
+        HStack(spacing: 3) {
+            // Play/pause/stop status indicator
+            PlayStatusIndicator(state: player.playbackState)
+                .frame(width: 8, height: 22)
+
+            // 7-segment LCD time
+            SegmentedTime(time: player.currentTime)
+                .frame(height: 22)
+
+            // Mini spectrum visualizer
+            MiniViz(levels: player.audioLevels)
+                .frame(width: 20, height: 22)
+        }
+        .padding(.horizontal, 2)
+    }
+}
+
+// MARK: - Display-area beveled toggle (EQ / PL)
+private struct DisplayToggleBtn: View {
+    let label: String
+    @Binding var active: Bool
+    var body: some View {
+        Button { active.toggle() } label: {
+            Text(label)
+                .font(.system(size: 7, weight: .heavy, design: .monospaced))
+                .foregroundColor(active ? WinampTheme.btnActive : WinampTheme.btnText)
+                .frame(width: 18, height: 12)
+                .background(active ? WinampTheme.frameDark : WinampTheme.btnFace)
+                .overlay(BevelBorder(pressed: active))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Play/Pause/Stop Status Indicator
 private struct PlayStatusIndicator: View {
     let state: PlaybackState
 
     var body: some View {
         ZStack {
-            // Outer glow
             switch state {
             case .playing:
-                // Animated play arrow
                 PlayingArrow()
             case .paused:
-                // Pause bars
                 HStack(spacing: 2) {
                     Rectangle().fill(WinampTheme.lcdGreen)
                         .frame(width: 3, height: 10)
@@ -171,7 +196,6 @@ private struct PlayStatusIndicator: View {
                         .frame(width: 3, height: 10)
                 }
             case .stopped:
-                // Stop square
                 Rectangle()
                     .fill(WinampTheme.lcdGreenDim)
                     .frame(width: 8, height: 8)
@@ -183,7 +207,6 @@ private struct PlayStatusIndicator: View {
 private struct PlayingArrow: View {
     @State private var phase: Bool = false
     var body: some View {
-        // Classic triangular play indicator
         Path { p in
             p.move(to: CGPoint(x: 2, y: 3))
             p.addLine(to: CGPoint(x: 12, y: 9))
@@ -210,14 +233,9 @@ private struct SegmentedTime: View {
 
     var body: some View {
         HStack(spacing: 1) {
-            // Minutes (up to 2 digits)
             LCDDigit(value: minutes / 10)
             LCDDigit(value: minutes % 10)
-
-            // Colon
             LCDColon()
-
-            // Seconds
             LCDDigit(value: seconds / 10)
             LCDDigit(value: seconds % 10)
         }
@@ -244,32 +262,24 @@ private struct LCDDigit: View {
 
     var body: some View {
         let segs = value >= 0 && value <= 9 ? LCDDigit.segments[value] : LCDDigit.segments[0]
-        let w: CGFloat = 12
-        let h: CGFloat = 24
-        let t: CGFloat = 2.5  // segment thickness
-        let g: CGFloat = 1    // gap
+        let w: CGFloat = 9
+        let h: CGFloat = 18
+        let t: CGFloat = 2
+        let g: CGFloat = 1
 
         Canvas { ctx, size in
-            // Draw each segment as a small rectangle
-            // top
             drawH(ctx: ctx, x: g, y: 0, w: w - 2*g, t: t,
                   color: segs[0] ? WinampTheme.lcdGreen : WinampTheme.lcdGreenFaint)
-            // top-right
             drawV(ctx: ctx, x: w - t, y: g, h: h/2 - g, t: t,
                   color: segs[1] ? WinampTheme.lcdGreen : WinampTheme.lcdGreenFaint)
-            // bottom-right
             drawV(ctx: ctx, x: w - t, y: h/2 + g, h: h/2 - g, t: t,
                   color: segs[2] ? WinampTheme.lcdGreen : WinampTheme.lcdGreenFaint)
-            // bottom
             drawH(ctx: ctx, x: g, y: h - t, w: w - 2*g, t: t,
                   color: segs[3] ? WinampTheme.lcdGreen : WinampTheme.lcdGreenFaint)
-            // bottom-left
             drawV(ctx: ctx, x: 0, y: h/2 + g, h: h/2 - g, t: t,
                   color: segs[4] ? WinampTheme.lcdGreen : WinampTheme.lcdGreenFaint)
-            // top-left
             drawV(ctx: ctx, x: 0, y: g, h: h/2 - g, t: t,
                   color: segs[5] ? WinampTheme.lcdGreen : WinampTheme.lcdGreenFaint)
-            // middle
             drawH(ctx: ctx, x: g, y: h/2 - t/2, w: w - 2*g, t: t,
                   color: segs[6] ? WinampTheme.lcdGreen : WinampTheme.lcdGreenFaint)
         }
@@ -290,15 +300,15 @@ private struct LCDColon: View {
     @State private var blink = true
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             Circle()
                 .fill(blink ? WinampTheme.lcdGreen : WinampTheme.lcdGreenFaint)
-                .frame(width: 3, height: 3)
+                .frame(width: 2.5, height: 2.5)
             Circle()
                 .fill(blink ? WinampTheme.lcdGreen : WinampTheme.lcdGreenFaint)
-                .frame(width: 3, height: 3)
+                .frame(width: 2.5, height: 2.5)
         }
-        .frame(width: 6, height: 24)
+        .frame(width: 5, height: 18)
         .onAppear {
             withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
                 blink.toggle()
@@ -307,13 +317,13 @@ private struct LCDColon: View {
     }
 }
 
-// MARK: - Mini Spectrum Visualizer (inside display, right of time)
+// MARK: - Mini Spectrum Visualizer
 private struct MiniViz: View {
     let levels: [Float]
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 1) {
-            ForEach(0..<min(12, levels.count), id: \.self) { i in
+            ForEach(0..<min(10, levels.count), id: \.self) { i in
                 VizBar(level: CGFloat(levels[i]))
             }
         }
@@ -350,7 +360,7 @@ private struct VizBar: View {
     }
 }
 
-// MARK: - Mono/Stereo Indicator (like monoster.bmp)
+// MARK: - Mono / Stereo indicator
 private struct MonoStereoIndicator: View {
     let label: String
     let active: Bool
@@ -362,7 +372,7 @@ private struct MonoStereoIndicator: View {
     }
 }
 
-// MARK: - Scrolling Ticker (like text.bmp area)
+// MARK: - Scrolling Ticker
 private struct ScrollingTicker: View {
     let text: String
     let scrollID: UUID

@@ -12,9 +12,11 @@ struct WinampEqualizer: View {
     @State private var eqEnabled = true
     @State private var autoEQ = false
     @State private var preamp: Double = 0.5
-    @State private var bands: [Double] = [0.5, 0.55, 0.6, 0.65, 0.55, 0.45, 0.5, 0.4, 0.45, 0.5]
+    @State private var bands: [Double] = Array(repeating: 0.5, count: 10)
+    @State private var presetName: String = "Flat"
 
-    private let bandLabels = ["60", "170", "310", "600", "1K", "3K", "6K", "12K", "14K", "16K"]
+    // Band labels matching the reference video
+    private let bandLabels = ["70", "180", "320", "600", "1K", "3K", "6K", "12K", "14K", "16K"]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,16 +37,7 @@ struct WinampEqualizer: View {
 
                 Spacer()
 
-                Button(action: {}) {
-                    Text("PRESETS")
-                        .font(.system(size: 7, weight: .bold, design: .monospaced))
-                        .foregroundColor(WinampTheme.btnText)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(WinampTheme.btnFace)
-                        .overlay(BevelBorder())
-                }
-                .buttonStyle(.plain)
+                PresetsMenu(applyPreset: applyPreset)
             }
             .padding(.horizontal, 5)
             .padding(.vertical, 3)
@@ -53,15 +46,15 @@ struct WinampEqualizer: View {
             HStack(alignment: .center, spacing: 0) {
                 // dB scale labels (vertical, left side)
                 VStack(spacing: 0) {
-                    Text("+20db")
+                    Text("+12db")
                         .font(.system(size: 5.5, weight: .bold, design: .monospaced))
                         .foregroundColor(WinampTheme.lcdGreenDim)
                     Spacer()
-                    Text("+0db")
+                    Text("0db")
                         .font(.system(size: 5.5, weight: .bold, design: .monospaced))
                         .foregroundColor(WinampTheme.lcdGreenDim)
                     Spacer()
-                    Text("-20db")
+                    Text("-12db")
                         .font(.system(size: 5.5, weight: .bold, design: .monospaced))
                         .foregroundColor(WinampTheme.lcdGreenDim)
                 }
@@ -141,6 +134,98 @@ struct WinampEqualizer: View {
             )
         )
     }
+
+    // MARK: - Preset handling
+    private func applyPreset(_ preset: EQPresets.Preset) {
+        presetName = preset.name
+        // Animate the slider transition
+        withAnimation(.easeInOut(duration: 0.15)) {
+            preamp = preset.preamp
+            bands = preset.bands
+        }
+    }
+}
+
+// MARK: - PRESETS button with dropdown (cross-platform)
+private struct PresetsMenu: View {
+    let applyPreset: (EQPresets.Preset) -> Void
+
+    var body: some View {
+        Menu {
+            ForEach(EQPresets.all, id: \.name) { preset in
+                Button(preset.name) { applyPreset(preset) }
+            }
+        } label: {
+            Text("PRESETS")
+                .font(.system(size: 7, weight: .bold, design: .monospaced))
+                .foregroundColor(WinampTheme.btnText)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(WinampTheme.btnFace)
+                .overlay(BevelBorder())
+        }
+        .menuIndicator(.hidden)
+        .fixedSize()
+    }
+}
+
+// MARK: - Classic Winamp EQ presets
+/// The preset values are normalized 0…1 (0.5 = 0 dB center, 1.0 = +20 dB, 0.0 = -20 dB).
+/// These match the original Winamp 2.x default presets.
+enum EQPresets {
+    struct Preset {
+        let name: String
+        let preamp: Double
+        let bands: [Double]   // 10 values — 70 Hz → 16 kHz
+    }
+
+    static let all: [Preset] = [
+        Preset(name: "Flat",
+               preamp: 0.50,
+               bands: [0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50]),
+        Preset(name: "Rock",
+               preamp: 0.55,
+               bands: [0.72, 0.65, 0.58, 0.45, 0.40, 0.48, 0.62, 0.70, 0.72, 0.70]),
+        Preset(name: "Pop",
+               preamp: 0.52,
+               bands: [0.42, 0.50, 0.60, 0.68, 0.70, 0.62, 0.50, 0.42, 0.40, 0.40]),
+        Preset(name: "Classical",
+               preamp: 0.50,
+               bands: [0.55, 0.55, 0.52, 0.50, 0.50, 0.50, 0.42, 0.42, 0.42, 0.40]),
+        Preset(name: "Jazz",
+               preamp: 0.52,
+               bands: [0.58, 0.55, 0.52, 0.55, 0.48, 0.48, 0.50, 0.52, 0.58, 0.60]),
+        Preset(name: "Dance",
+               preamp: 0.55,
+               bands: [0.75, 0.68, 0.58, 0.50, 0.48, 0.40, 0.40, 0.55, 0.65, 0.70]),
+        Preset(name: "Techno",
+               preamp: 0.55,
+               bands: [0.70, 0.65, 0.52, 0.42, 0.45, 0.55, 0.68, 0.72, 0.70, 0.68]),
+        Preset(name: "Full Bass",
+               preamp: 0.55,
+               bands: [0.78, 0.75, 0.70, 0.60, 0.50, 0.40, 0.35, 0.32, 0.30, 0.30]),
+        Preset(name: "Full Treble",
+               preamp: 0.52,
+               bands: [0.30, 0.30, 0.32, 0.40, 0.50, 0.62, 0.75, 0.82, 0.85, 0.85]),
+        Preset(name: "Full Bass & Treble",
+               preamp: 0.55,
+               bands: [0.72, 0.68, 0.55, 0.40, 0.42, 0.50, 0.65, 0.78, 0.82, 0.82]),
+        Preset(name: "Live",
+               preamp: 0.52,
+               bands: [0.40, 0.52, 0.58, 0.62, 0.62, 0.62, 0.58, 0.55, 0.55, 0.52]),
+        Preset(name: "Party",
+               preamp: 0.55,
+               bands: [0.68, 0.68, 0.52, 0.50, 0.50, 0.50, 0.50, 0.52, 0.68, 0.68]),
+        Preset(name: "Soft",
+               preamp: 0.52,
+               bands: [0.60, 0.52, 0.45, 0.42, 0.48, 0.58, 0.68, 0.70, 0.72, 0.75]),
+        Preset(name: "Ska",
+               preamp: 0.52,
+               bands: [0.38, 0.32, 0.35, 0.45, 0.55, 0.58, 0.65, 0.68, 0.70, 0.68]),
+        Preset(name: "Reggae",
+               preamp: 0.50,
+               bands: [0.50, 0.50, 0.50, 0.38, 0.50, 0.65, 0.65, 0.50, 0.50, 0.50]),
+    ]
 }
 
 // MARK: - EQ toggle button (ON / AUTO)
@@ -215,7 +300,7 @@ private struct EQCurveLine: View {
     }
 }
 
-// MARK: - Vertical EQ slider (classic Winamp style with gradient fill)
+// MARK: - Vertical EQ slider — classic Winamp yellow/orange fill + horizontal thumb
 private struct EQSlider: View {
     @Binding var value: Double   // 0 (bottom) … 1 (top)
 
@@ -223,67 +308,61 @@ private struct EQSlider: View {
         GeometryReader { g in
             let w = g.size.width
             let h = g.size.height
-            let thumbH: CGFloat = 8
-            let thumbW: CGFloat = w
-            let trackW: CGFloat = 6
+            let thumbH: CGFloat = 4          // slim horizontal bar thumb
+            let thumbW: CGFloat = max(10, w - 1)
+            let trackW: CGFloat = 5
             let trackH = h - thumbH
 
             ZStack {
-                // Groove with gradient colored fill
-                // The fill shows green at bottom, yellow in middle, orange/red at top
-                ZStack(alignment: .bottom) {
-                    // Dark background
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(Color(red: 0.06, green: 0.06, blue: 0.10))
-                        .frame(width: trackW)
-
-                    // Gradient fill from bottom to current value
-                    // Below center = green fill from bottom up to thumb
-                    // Above center = colored fill
-                    LinearGradient(
-                        colors: [
-                            WinampTheme.eqGreen,
-                            WinampTheme.eqGreen,
-                            WinampTheme.eqYellow,
-                            Color(red: 0.90, green: 0.55, blue: 0.0),
-                            WinampTheme.eqRed
-                        ],
-                        startPoint: .bottom,
-                        endPoint: .top
+                // Dark recessed groove
+                RoundedRectangle(cornerRadius: 0.5)
+                    .fill(Color(red: 0.06, green: 0.06, blue: 0.10))
+                    .frame(width: trackW, height: trackH)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 0.5)
+                            .stroke(Color(red: 0.15, green: 0.15, blue: 0.22), lineWidth: 0.5)
+                            .frame(width: trackW, height: trackH)
                     )
-                    .frame(width: trackW, height: max(0, trackH * value))
-                    .clipShape(RoundedRectangle(cornerRadius: 1))
+
+                // Solid yellow/orange fill from bottom up to current value
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    RoundedRectangle(cornerRadius: 0.5)
+                        .fill(LinearGradient(
+                            colors: [
+                                Color(red: 0.95, green: 0.75, blue: 0.05),
+                                Color(red: 0.85, green: 0.55, blue: 0.0)
+                            ],
+                            startPoint: .top, endPoint: .bottom
+                        ))
+                        .frame(width: trackW, height: max(0, trackH * value))
                 }
                 .frame(width: trackW, height: trackH)
-                .overlay(RoundedRectangle(cornerRadius: 1).stroke(Color(red: 0.15, green: 0.15, blue: 0.22), lineWidth: 0.5))
 
                 // Centre notch (0 dB reference line)
                 Rectangle()
                     .fill(WinampTheme.lcdGreenDim.opacity(0.5))
-                    .frame(width: w - 2, height: 1)
+                    .frame(width: w - 2, height: 0.5)
 
-                // Thumb (small square handle)
+                // Horizontal bar thumb
                 ZStack {
-                    RoundedRectangle(cornerRadius: 1)
+                    RoundedRectangle(cornerRadius: 0.5)
                         .fill(LinearGradient(
                             colors: [
                                 WinampTheme.sliderThumbHighlight,
                                 WinampTheme.sliderThumb,
                                 Color(red: 0.36, green: 0.38, blue: 0.40)
                             ],
-                            startPoint: .top,
-                            endPoint: .bottom
+                            startPoint: .top, endPoint: .bottom
                         ))
                         .frame(width: thumbW, height: thumbH)
-                    // Notch lines on thumb
-                    VStack(spacing: 1.5) {
-                        Rectangle().fill(WinampTheme.frameShadow).frame(width: thumbW - 4, height: 0.5)
-                        Rectangle().fill(WinampTheme.sliderThumbHighlight).frame(width: thumbW - 4, height: 0.5)
-                        Rectangle().fill(WinampTheme.frameShadow).frame(width: thumbW - 4, height: 0.5)
-                    }
+                    // Single dark notch line
+                    Rectangle()
+                        .fill(WinampTheme.frameShadow)
+                        .frame(width: thumbW - 2, height: 0.5)
                 }
                 .overlay(
-                    RoundedRectangle(cornerRadius: 1)
+                    RoundedRectangle(cornerRadius: 0.5)
                         .stroke(WinampTheme.frameShadow, lineWidth: 0.5)
                         .frame(width: thumbW, height: thumbH)
                 )
