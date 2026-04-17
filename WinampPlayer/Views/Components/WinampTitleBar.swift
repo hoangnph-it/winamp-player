@@ -1,14 +1,16 @@
 import SwiftUI
 
-/// Classic Winamp 2.x dark-blue title bar with horizontal pinstripes on both
-/// sides of the centered title text (titlebar.bmp).
+/// Classic Winamp 2.x dark-blue title bar with horizontal pinstripes.
+/// Layout (matching reference video):
+///   [•]  ==============  WINAMP  ==============  [_][▭][×]
+///   LED  pinstripes       title   pinstripes      window controls
 struct WinampTitleBar: View {
     let title: String
     var isActive: Bool = true
 
     var body: some View {
         ZStack {
-            // Background gradient
+            // Background gradient (active = blue, inactive = dark gray)
             LinearGradient(
                 colors: isActive
                     ? [WinampTheme.titleBarLeft, WinampTheme.titleBarRight]
@@ -16,25 +18,32 @@ struct WinampTitleBar: View {
                 startPoint: .leading, endPoint: .trailing
             )
 
-            // Pinstripes — horizontal hatching lines on both sides of title.
-            // Drawn across the full width; the title text overlays the middle
-            // band so the stripes only show on the sides.
+            // Horizontal pinstripe pattern across full width
             Pinstripes()
                 .opacity(isActive ? 0.45 : 0.25)
                 .allowsHitTesting(false)
 
-            // Title text (covers the pinstripes in the middle)
+            // Foreground row: LED — TITLE (left) — pinstripes fill — WINDOW CTRLS
             HStack(spacing: 0) {
-                Spacer(minLength: 2)
+                // Left-edge LED indicator (classic Winamp shade/mini button)
+                Circle()
+                    .fill(isActive
+                          ? WinampTheme.lcdGreen
+                          : WinampTheme.lcdGreenFaint)
+                    .frame(width: 3, height: 3)
+                    .padding(.leading, 6)
+                    .padding(.trailing, 6)
 
+                // Title text — LEFT-aligned. Classic Winamp places the
+                // title near the left with pinstripes filling the rest.
                 Text(title)
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundColor(isActive ? .white : WinampTheme.btnText)
                     .lineLimit(1)
                     .padding(.horizontal, 6)
                     .background(
-                        // Same gradient background to "mask" the pinstripes
-                        // beneath the title text.
+                        // Mask the pinstripes beneath the title with the
+                        // same gradient for readability.
                         LinearGradient(
                             colors: isActive
                                 ? [WinampTheme.titleBarLeft, WinampTheme.titleBarRight]
@@ -43,12 +52,9 @@ struct WinampTitleBar: View {
                         )
                     )
 
-                Spacer(minLength: 2)
-            }
+                Spacer(minLength: 0)
 
-            // Window buttons (minimize, shade, close) — decorative, right side
-            HStack {
-                Spacer()
+                // Right-side window controls
                 HStack(spacing: 1) {
                     TitleBarBtn(icon: "minus")
                     TitleBarBtn(icon: "square")

@@ -24,8 +24,11 @@ class MusicLibraryManager: ObservableObject {
 
     private let fileManager = FileManager.default
 
-    // UserDefaults key for the saved bookmark
+    // UserDefaults keys for the saved bookmark
     private let bookmarkKey = "SavedMusicFolderBookmark"
+    /// Whether the saved bookmark was created with `.withSecurityScope` (true)
+    /// or as a plain bookmark (false, for File Provider URLs like Google Drive).
+    private let bookmarkIsScopedKey = "SavedMusicFolderBookmarkIsScoped"
 
     // MARK: - Initialization
 
@@ -40,26 +43,88 @@ class MusicLibraryManager: ObservableObject {
 
     // MARK: - Bookmark Persistence
 
-    /// Save a security-scoped bookmark so we can re-access the folder next launch
+    /// Heuristic: is this URL served by a File Provider that typically refuses
+    /// security-scoped bookmarks (Google Drive / Dropbox / OneDrive under
+    /// `~/Library/CloudStorage/`, or iCloud Drive under `~/Library/Mobile
+    /// Documents/`)?
+    private func isFileProviderURL(_ url: URL) -> Bool {
+        let path = url.path
+        return path.contains("/Library/CloudStorage/")
+            || path.contains("/Library/Mobile Documents/")
+    }
+
+    /// Save a bookmark so we can re-access the folder next launch.
+    ///
+    /// For regular user-selected folders we use `.withSecurityScope` (the
+    /// standard sandbox pattern).
+    ///
+    /// For File Provider URLs (Google Drive, Dropbox, etc.) `.withSecurityScope`
+    /// reliably fails with `NSCocoaErrorDomain Code=256 "Operation not
+    /// permitted"` — macOS can't serialize a scoped bookmark for those paths.
+    /// We fall back to a plain bookmark and note that fact so `restoreBookmark`
+    /// can resolve it correctly.
+    ///
+    /// This method never throws — bookmark persistence is a "nice to have";
+    /// if it fails, the user just has to re-pick their folder next launch.
     func saveBookmark(for url: URL) {
+        #if os(macOS)
+        // Ensure security-scoped access is active while we serialize the
+        // bookmark. fileImporter gives implicit access to the returned URL,
+        // but that access is scoped to the callback; calling start/stop
+        // explicitly here keeps things deterministic.
+        let didStartAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccess { url.stopAccessingSecurityScopedResource() }
+        }
+
+        let isProvider = isFileProviderURL(url)
+        let scopedOpts: URL.BookmarkCreationOptions = [.withSecurityScope]
+        let plainOpts: URL.BookmarkCreationOptions = []
+
+        // Try scoped first for regular folders; for File Provider paths,
+        // skip straight to the plain-bookmark fallback.
+        if !isProvider {
+            if let data = try? url.bookmarkData(
+                options: scopedOpts,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            ) {
+                UserDefaults.standard.set(data, forKey: bookmarkKey)
+                UserDefaults.standard.set(true, forKey: bookmarkIsScopedKey)
+                return
+            }
+        }
+
+        // Fallback: plain bookmark (works for File Provider paths).
         do {
-            #if os(macOS)
-            let bookmarkData = try url.bookmarkData(
-                options: .withSecurityScope,
+            let data = try url.bookmarkData(
+                options: plainOpts,
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
-            #else
-            let bookmarkData = try url.bookmarkData(
+            UserDefaults.standard.set(data, forKey: bookmarkKey)
+            UserDefaults.standard.set(false, forKey: bookmarkIsScopedKey)
+            // Plain bookmark is expected for File Provider paths — no log needed.
+        } catch {
+            // Both options failed — we can still use the folder for this
+            // session (via startAccessingSecurityScopedResource from the
+            // picker), but won't remember it across launches.
+            print("⚠️ Could not persist bookmark for \(url.lastPathComponent); " +
+                  "folder will need to be re-selected on next launch. Error: \(error.localizedDescription)")
+        }
+        #else
+        do {
+            let data = try url.bookmarkData(
                 options: [],
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
-            #endif
-            UserDefaults.standard.set(bookmarkData, forKey: bookmarkKey)
+            UserDefaults.standard.set(data, forKey: bookmarkKey)
+            UserDefaults.standard.set(false, forKey: bookmarkIsScopedKey)
         } catch {
-            print("Failed to save bookmark: \(error)")
+            print("⚠️ Could not persist bookmark: \(error.localizedDescription)")
         }
+        #endif
     }
 
     /// Restore a previously saved bookmark on launch
@@ -69,27 +134,26 @@ class MusicLibraryManager: ObservableObject {
             return
         }
 
+        #if os(macOS)
+        // Match the option set that was used when the bookmark was saved.
+        let wasScoped = UserDefaults.standard.object(forKey: bookmarkIsScopedKey) as? Bool ?? true
+        let resolveOpts: URL.BookmarkResolutionOptions = wasScoped ? [.withSecurityScope] : []
+        #else
+        let resolveOpts: URL.BookmarkResolutionOptions = []
+        #endif
+
         do {
             var isStale = false
-            #if os(macOS)
             let url = try URL(
                 resolvingBookmarkData: bookmarkData,
-                options: .withSecurityScope,
+                options: resolveOpts,
                 relativeTo: nil,
                 bookmarkDataIsStale: &isStale
             )
-            #else
-            let url = try URL(
-                resolvingBookmarkData: bookmarkData,
-                options: [],
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            )
-            #endif
 
             if isStale {
                 // Bookmark is stale — re-save if we still have access
-                print("Bookmark is stale, attempting to refresh...")
+                print("Bookmark is stale, attempting to refresh…")
                 if url.startAccessingSecurityScopedResource() {
                     saveBookmark(for: url)
                     url.stopAccessingSecurityScopedResource()
@@ -102,7 +166,7 @@ class MusicLibraryManager: ObservableObject {
             selectedFolderURL = url
             needsFolderSelection = false
         } catch {
-            print("Failed to restore bookmark: \(error)")
+            print("Failed to restore bookmark: \(error.localizedDescription)")
             needsFolderSelection = true
         }
     }

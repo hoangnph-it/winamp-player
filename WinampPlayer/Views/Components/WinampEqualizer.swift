@@ -228,20 +228,35 @@ enum EQPresets {
     ]
 }
 
-// MARK: - EQ toggle button (ON / AUTO)
+// MARK: - EQ toggle button (ON / AUTO) — with LED dot indicator
 private struct EQToggle: View {
     let label: String
     @Binding var active: Bool
     var body: some View {
         Button { active.toggle() } label: {
-            Text(label)
-                .font(.system(size: 7, weight: .heavy, design: .monospaced))
-                .foregroundColor(active ? WinampTheme.btnActive : WinampTheme.btnText)
-                .frame(height: 12)
-                .frame(minWidth: 22)
-                .padding(.horizontal, 2)
-                .background(active ? WinampTheme.frameDark : WinampTheme.btnFace)
-                .overlay(BevelBorder(pressed: active))
+            HStack(spacing: 3) {
+                // Tiny green LED dot (lit when active, dim when off)
+                Circle()
+                    .fill(active ? WinampTheme.lcdGreen : WinampTheme.lcdGreenFaint)
+                    .frame(width: 3, height: 3)
+                    .overlay(
+                        Circle()
+                            .stroke(WinampTheme.frameShadow, lineWidth: 0.5)
+                    )
+                    .shadow(color: active
+                            ? WinampTheme.lcdGreen.opacity(0.6)
+                            : .clear,
+                            radius: 1)
+
+                Text(label)
+                    .font(.system(size: 7, weight: .heavy, design: .monospaced))
+                    .foregroundColor(active ? WinampTheme.btnActive : WinampTheme.btnText)
+            }
+            .frame(height: 12)
+            .frame(minWidth: 28)
+            .padding(.horizontal, 3)
+            .background(active ? WinampTheme.frameDark : WinampTheme.btnFace)
+            .overlay(BevelBorder(pressed: active))
         }
         .buttonStyle(.plain)
     }
@@ -344,26 +359,36 @@ private struct EQSlider: View {
                     .fill(WinampTheme.lcdGreenDim.opacity(0.5))
                     .frame(width: w - 2, height: 0.5)
 
-                // Horizontal bar thumb
+                // Horizontal bar thumb — classic Winamp yellow with 3 black stripes
                 ZStack {
                     RoundedRectangle(cornerRadius: 0.5)
                         .fill(LinearGradient(
                             colors: [
-                                WinampTheme.sliderThumbHighlight,
-                                WinampTheme.sliderThumb,
-                                Color(red: 0.36, green: 0.38, blue: 0.40)
+                                Color(red: 0.98, green: 0.85, blue: 0.20),  // bright yellow top
+                                Color(red: 0.92, green: 0.72, blue: 0.08),  // amber mid
+                                Color(red: 0.70, green: 0.52, blue: 0.0)    // darker amber bottom
                             ],
                             startPoint: .top, endPoint: .bottom
                         ))
                         .frame(width: thumbW, height: thumbH)
-                    // Single dark notch line
-                    Rectangle()
-                        .fill(WinampTheme.frameShadow)
-                        .frame(width: thumbW - 2, height: 0.5)
+
+                    // Three horizontal black stripes (classic Winamp grip)
+                    VStack(spacing: 0.5) {
+                        Rectangle()
+                            .fill(Color.black.opacity(0.75))
+                            .frame(width: thumbW - 2, height: 0.5)
+                        Rectangle()
+                            .fill(Color.black.opacity(0.75))
+                            .frame(width: thumbW - 2, height: 0.5)
+                        Rectangle()
+                            .fill(Color.black.opacity(0.75))
+                            .frame(width: thumbW - 2, height: 0.5)
+                    }
+                    .frame(width: thumbW, height: thumbH)
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: 0.5)
-                        .stroke(WinampTheme.frameShadow, lineWidth: 0.5)
+                        .stroke(Color.black.opacity(0.85), lineWidth: 0.5)
                         .frame(width: thumbW, height: thumbH)
                 )
                 .offset(y: (0.5 - value) * trackH)

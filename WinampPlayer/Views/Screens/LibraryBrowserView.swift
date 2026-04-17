@@ -131,7 +131,13 @@ struct LibraryBrowserView: View {
             allowsMultipleSelection: false
         ) { result in
             if case .success(let urls) = result, let url = urls.first {
-                _ = url.startAccessingSecurityScopedResource()
+                // Balance start/stop around the synchronous bookmark save
+                // inside scanFolder(at:). The async scanner in scanLocalFolder
+                // starts its own independent access refcount for the enumeration.
+                let started = url.startAccessingSecurityScopedResource()
+                defer {
+                    if started { url.stopAccessingSecurityScopedResource() }
+                }
                 library.scanFolder(at: url)
             }
         }

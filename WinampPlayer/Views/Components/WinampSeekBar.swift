@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Classic Winamp 2.x position bar (posbar.bmp)
-/// A thin groove with a small rectangular thumb that slides along it
+/// Classic Winamp 2.x position bar (posbar.bmp) — a thin recessed groove with
+/// subtle graduated tick marks and a small rectangular thumb.
 struct WinampSeekBar: View {
     @EnvironmentObject var player: AudioPlayerManager
     @State private var dragging = false
@@ -15,49 +15,36 @@ struct WinampSeekBar: View {
     var body: some View {
         GeometryReader { g in
             let w = g.size.width
-            let thumbW: CGFloat = 14
-            let thumbH: CGFloat = 8
+            let thumbW: CGFloat = 29
+            let thumbH: CGFloat = 10
             let grooveH: CGFloat = 3
 
             ZStack(alignment: .leading) {
-                // Groove (recessed look)
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(WinampTheme.sliderTrack)
-                    .frame(height: grooveH)
-                    .overlay(
-                        // Inner shadow for depth
-                        VStack(spacing: 0) {
-                            Rectangle().fill(WinampTheme.frameShadow).frame(height: 1)
-                            Spacer()
-                            Rectangle().fill(WinampTheme.frameHighlight.opacity(0.3)).frame(height: 1)
-                        }
+                // Groove (recessed look) with classic top/bottom bevel
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(WinampTheme.sliderTrack)
                         .frame(height: grooveH)
-                    )
 
-                // Filled portion
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(WinampTheme.sliderFill)
-                    .frame(width: max(0, w * pct), height: grooveH)
+                    // Graduated tick marks — tiny dim vertical pips along the
+                    // groove at regular intervals, emulating the classic
+                    // position-bar ruler look.
+                    GraduatedTicks(count: 28)
+                        .frame(height: grooveH)
 
-                // Thumb (classic small rectangular knob)
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(WinampTheme.sliderThumb)
+                    // Top shadow + bottom highlight for recessed bevel
+                    VStack(spacing: 0) {
+                        Rectangle().fill(WinampTheme.frameShadow).frame(height: 1)
+                        Spacer()
+                        Rectangle().fill(WinampTheme.frameHighlight.opacity(0.30)).frame(height: 1)
+                    }
+                    .frame(height: grooveH)
+                    .allowsHitTesting(false)
+                }
+
+                // Thumb (classic small rectangular knob with bevel)
+                SeekThumb()
                     .frame(width: thumbW, height: thumbH)
-                    .overlay(
-                        // Bevel on thumb
-                        ZStack {
-                            VStack(spacing: 0) {
-                                Rectangle().fill(WinampTheme.sliderThumbHighlight).frame(height: 1)
-                                Spacer()
-                                Rectangle().fill(WinampTheme.frameShadow).frame(height: 1)
-                            }
-                            HStack(spacing: 0) {
-                                Rectangle().fill(WinampTheme.sliderThumbHighlight).frame(width: 1)
-                                Spacer()
-                                Rectangle().fill(WinampTheme.frameShadow).frame(width: 1)
-                            }
-                        }
-                    )
                     .offset(x: max(0, min(w - thumbW, w * pct - thumbW / 2)))
             }
             .frame(height: max(grooveH, thumbH))
@@ -76,5 +63,58 @@ struct WinampSeekBar: View {
             )
         }
         .frame(height: 10)
+    }
+}
+
+// MARK: - Graduated tick marks along the groove
+private struct GraduatedTicks: View {
+    let count: Int
+
+    var body: some View {
+        GeometryReader { g in
+            HStack(spacing: 0) {
+                ForEach(0..<count, id: \.self) { i in
+                    Rectangle()
+                        .fill(Color.white.opacity(i % 4 == 0 ? 0.18 : 0.08))
+                        .frame(width: 1)
+                    if i < count - 1 {
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .frame(width: g.size.width)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Classic Winamp position-bar thumb (posbar_knob)
+private struct SeekThumb: View {
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(WinampTheme.sliderThumb)
+
+            // 3 vertical grip lines down the middle
+            HStack(spacing: 2) {
+                ForEach(0..<3, id: \.self) { _ in
+                    Rectangle()
+                        .fill(WinampTheme.frameShadow.opacity(0.8))
+                        .frame(width: 1, height: 6)
+                }
+            }
+
+            // Bevel
+            VStack(spacing: 0) {
+                Rectangle().fill(WinampTheme.sliderThumbHighlight).frame(height: 1)
+                Spacer()
+                Rectangle().fill(WinampTheme.frameShadow).frame(height: 1)
+            }
+            HStack(spacing: 0) {
+                Rectangle().fill(WinampTheme.sliderThumbHighlight).frame(width: 1)
+                Spacer()
+                Rectangle().fill(WinampTheme.frameShadow).frame(width: 1)
+            }
+        }
     }
 }

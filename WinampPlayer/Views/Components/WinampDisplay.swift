@@ -21,10 +21,13 @@ struct WinampDisplay: View {
     @State private var plOn: Bool = true
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
+            // ── FAR LEFT: Clutterbar (5 tiny O/A/I/D/V buttons) ──
+            Clutterbar()
+
             // ── LEFT: "Playbar" column ───────────────────────────
             Playbar()
-                .frame(width: 85)
+                .frame(width: 80)
 
             // ── RIGHT: 3-row info stack ──────────────────────────
             VStack(spacing: 1) {
@@ -33,7 +36,7 @@ struct WinampDisplay: View {
                 controlsRow
             }
             .frame(maxWidth: .infinity, alignment: .top)
-            .padding(.trailing, 4)
+            .padding(.trailing, 3)
         }
         .padding(.vertical, 2)
         .padding(.horizontal, 3)
@@ -71,9 +74,9 @@ struct WinampDisplay: View {
         .frame(height: 12)
     }
 
-    // MARK: Right column — row 2: kbps | kHz | mono | stereo
+    // MARK: Right column — row 2: kbps | kHz | mono | stereo (tight, left-grouped)
     private var infoRow: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 6) {
             // Bitrate
             HStack(spacing: 2) {
                 Text(player.bitrate > 0 ? "\(player.bitrate)" : (player.currentTrack != nil ? "128" : "---"))
@@ -84,8 +87,6 @@ struct WinampDisplay: View {
                     .font(.system(size: 7, weight: .semibold, design: .monospaced))
                     .foregroundColor(WinampTheme.lcdGreenDim)
             }
-
-            Spacer().frame(width: 10)
 
             // Sample rate
             HStack(spacing: 2) {
@@ -98,13 +99,13 @@ struct WinampDisplay: View {
                     .foregroundColor(WinampTheme.lcdGreenDim)
             }
 
-            Spacer()
-
-            // Mono / Stereo indicators
-            HStack(spacing: 8) {
+            // Mono / Stereo indicators — tight, right next to kHz
+            HStack(spacing: 6) {
                 MonoStereoIndicator(label: "mono", active: false)
                 MonoStereoIndicator(label: "stereo", active: player.currentTrack != nil)
             }
+
+            Spacer(minLength: 0)
         }
         .frame(height: 12)
     }
@@ -112,17 +113,17 @@ struct WinampDisplay: View {
     // MARK: Right column — row 3: volume slider | balance | EQ | PL
     private var controlsRow: some View {
         HStack(spacing: 4) {
-            // Volume bar (graduated)
+            // Volume bar (long, graduated — classic Winamp)
             GraduatedVolume(value: Binding(
                 get: { player.volume },
                 set: { player.setVolume($0) }
             ))
-            .frame(height: 12)
+            .frame(height: 13)
             .frame(maxWidth: .infinity)
 
-            // Balance bar
+            // Balance bar (short, graduated)
             GraduatedBalance(value: $balance)
-                .frame(width: 42, height: 12)
+                .frame(width: 38, height: 13)
 
             // EQ button
             DisplayToggleBtn(label: "EQ", active: $eqOn)
@@ -399,5 +400,45 @@ private struct ScrollingTicker: View {
         withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
             offset = w + 200
         }
+    }
+}
+
+// MARK: - Clutterbar (5 tiny Winamp shortcut buttons on the far left)
+///
+/// Classic Winamp 2.x places a column of 5 very small pixel buttons on the
+/// left edge of the LCD display:
+///   O = Options menu
+///   A = Always on Top
+///   I = File Info
+///   D = Double size
+///   V = Visualization mode
+///
+/// Each is ~8×4 px with a single letter. Decorative in this build.
+private struct Clutterbar: View {
+    var body: some View {
+        VStack(spacing: 1) {
+            ClutterBtn(letter: "O")
+            ClutterBtn(letter: "A")
+            ClutterBtn(letter: "I")
+            ClutterBtn(letter: "D")
+            ClutterBtn(letter: "V")
+        }
+        .frame(width: 10)
+        .padding(.vertical, 1)
+    }
+}
+
+private struct ClutterBtn: View {
+    let letter: String
+    var body: some View {
+        Text(letter)
+            .font(.system(size: 5, weight: .heavy, design: .monospaced))
+            .foregroundColor(WinampTheme.lcdGreenDim)
+            .frame(width: 8, height: 5)
+            .background(WinampTheme.displayBg)
+            .overlay(
+                Rectangle()
+                    .stroke(WinampTheme.lcdGreenFaint, lineWidth: 0.5)
+            )
     }
 }

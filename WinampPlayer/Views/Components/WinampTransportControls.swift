@@ -126,45 +126,53 @@ private struct WinampLightning: View {
     }
 }
 
-// MARK: - Orange horizontal volume slider (volume.bmp style)
-/// Thin dark groove with an orange-filled portion and a small grey thumb knob,
-/// matching the reference video's volume bar.
+// MARK: - Orange horizontal volume slider (volume.bmp style — graduated)
+/// Classic Winamp 2.x volume bar: a long orange-filled groove with tiny
+/// vertical graduated pip marks along its length and a small grey thumb.
 struct GraduatedVolume: View {
     @Binding var value: Float
+    /// How many graduated pip marks to draw along the slider.
+    var pipCount: Int = 28
 
     var body: some View {
         GeometryReader { g in
             let w = g.size.width
             let h = g.size.height
-            let grooveH: CGFloat = max(4, h - 4)
-            let thumbW: CGFloat = 8
-            let thumbH: CGFloat = max(6, h - 2)
+            let grooveH: CGFloat = max(7, h - 3)
+            let thumbW: CGFloat = 11
+            let thumbH: CGFloat = max(7, h - 1)
             let filledW = max(0, min(w, w * CGFloat(value)))
 
             ZStack(alignment: .leading) {
-                // Dark recessed groove
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(WinampTheme.sliderTrack)
-                    .frame(height: grooveH)
-                    .overlay(
-                        VStack(spacing: 0) {
-                            Rectangle().fill(WinampTheme.frameShadow).frame(height: 1)
-                            Spacer()
-                            Rectangle().fill(WinampTheme.frameHighlight.opacity(0.35)).frame(height: 1)
-                        }
+                // Dark recessed groove with top/bottom bevel
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(WinampTheme.sliderTrack)
                         .frame(height: grooveH)
-                        .clipShape(RoundedRectangle(cornerRadius: 1))
-                    )
 
-                // Orange fill
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.95, green: 0.55, blue: 0.05),
-                        Color(red: 0.80, green: 0.42, blue: 0.0)
-                    ],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .frame(width: filledW, height: grooveH)
+                    // Orange fill (graduated portion)
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.98, green: 0.62, blue: 0.10),
+                            Color(red: 0.78, green: 0.38, blue: 0.0)
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    .frame(width: filledW, height: grooveH)
+
+                    // Graduated pip marks — tiny vertical dark ticks across
+                    // the full groove, giving it the classic ruler look.
+                    GraduatedPips(count: pipCount, height: grooveH)
+
+                    // Bevel
+                    VStack(spacing: 0) {
+                        Rectangle().fill(WinampTheme.frameShadow).frame(height: 1)
+                        Spacer()
+                        Rectangle().fill(WinampTheme.frameHighlight.opacity(0.30)).frame(height: 1)
+                    }
+                    .frame(height: grooveH)
+                    .allowsHitTesting(false)
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 1))
 
                 // Thumb knob
@@ -184,19 +192,44 @@ struct GraduatedVolume: View {
     }
 }
 
-// MARK: - Orange horizontal balance slider (balance.bmp style)
+/// Tiny vertical pip marks spaced evenly along a slider groove — gives the
+/// classic "graduated ruler" appearance of the Winamp volume/balance bars.
+private struct GraduatedPips: View {
+    let count: Int
+    let height: CGFloat
+
+    var body: some View {
+        GeometryReader { g in
+            let w = g.size.width
+            let step = w / CGFloat(max(1, count - 1))
+            ZStack(alignment: .leading) {
+                ForEach(0..<count, id: \.self) { i in
+                    let x = CGFloat(i) * step
+                    Rectangle()
+                        .fill(Color.black.opacity(0.35))
+                        .frame(width: 1, height: height - 2)
+                        .offset(x: x)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Orange horizontal balance slider (balance.bmp style — graduated)
 /// Same orange slider look as volume but center-zero: filled outward from the
-/// middle toward whichever side is biased.
+/// middle toward whichever side is biased, with graduated pip marks.
 struct GraduatedBalance: View {
     @Binding var value: Float
+    var pipCount: Int = 9
 
     var body: some View {
         GeometryReader { g in
             let w = g.size.width
             let h = g.size.height
-            let grooveH: CGFloat = max(4, h - 4)
-            let thumbW: CGFloat = 8
-            let thumbH: CGFloat = max(6, h - 2)
+            let grooveH: CGFloat = max(7, h - 3)
+            let thumbW: CGFloat = 11
+            let thumbH: CGFloat = max(7, h - 1)
             let center = w / 2
             let pos = w * CGFloat(value)
 
@@ -205,37 +238,42 @@ struct GraduatedBalance: View {
             let fillWidth = abs(pos - center)
 
             ZStack(alignment: .leading) {
-                // Groove
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(WinampTheme.sliderTrack)
-                    .frame(height: grooveH)
-                    .overlay(
-                        VStack(spacing: 0) {
-                            Rectangle().fill(WinampTheme.frameShadow).frame(height: 1)
-                            Spacer()
-                            Rectangle().fill(WinampTheme.frameHighlight.opacity(0.35)).frame(height: 1)
-                        }
+                ZStack(alignment: .leading) {
+                    // Dark groove
+                    Rectangle()
+                        .fill(WinampTheme.sliderTrack)
                         .frame(height: grooveH)
-                        .clipShape(RoundedRectangle(cornerRadius: 1))
+
+                    // Orange fill from center outward
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.98, green: 0.62, blue: 0.10),
+                            Color(red: 0.78, green: 0.38, blue: 0.0)
+                        ],
+                        startPoint: .top, endPoint: .bottom
                     )
+                    .frame(width: fillWidth, height: grooveH)
+                    .offset(x: fillStart)
 
-                // Orange fill from center outward
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.95, green: 0.55, blue: 0.05),
-                        Color(red: 0.80, green: 0.42, blue: 0.0)
-                    ],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .frame(width: fillWidth, height: grooveH)
-                .offset(x: fillStart)
+                    // Graduated pips
+                    GraduatedPips(count: pipCount, height: grooveH)
+
+                    // Brighter center tick
+                    Rectangle()
+                        .fill(WinampTheme.lcdGreenDim.opacity(0.8))
+                        .frame(width: 1, height: grooveH - 1)
+                        .offset(x: center - 0.5)
+
+                    // Bevel
+                    VStack(spacing: 0) {
+                        Rectangle().fill(WinampTheme.frameShadow).frame(height: 1)
+                        Spacer()
+                        Rectangle().fill(WinampTheme.frameHighlight.opacity(0.30)).frame(height: 1)
+                    }
+                    .frame(height: grooveH)
+                    .allowsHitTesting(false)
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 1))
-
-                // Small center tick mark
-                Rectangle()
-                    .fill(WinampTheme.frameHighlight.opacity(0.45))
-                    .frame(width: 1, height: grooveH - 1)
-                    .offset(x: center - 0.5)
 
                 // Thumb
                 SliderThumb()
