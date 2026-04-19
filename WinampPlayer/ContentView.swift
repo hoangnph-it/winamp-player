@@ -81,52 +81,15 @@ struct WinampLayout: View {
     #endif
 }
 
-// MARK: - The Main player "window" (Title bar + display + seek + transport)
+// MARK: - The Main player "window" (Phase 3: real Winamp skin sprites)
 ///
-///  Row layout, matching the reference video and user spec:
-///     ┌─────────────────────────────────────────────────────┐
-///     │ WINAMP (title bar)                                  │
-///     ├─────────────────────────────────────────────────────┤
-///     │ ┌──────────┐  ▸ scrolling title               1/N   │
-///     │ │ Playbar  │  128 kbps   44 kHz    mono   stereo    │  ← WinampDisplay
-///     │ │ (LCD +   │  [======vol======][bal]  [EQ] [PL]     │
-///     │ │  viz)    │                                        │
-///     │ └──────────┘                                        │
-///     │  ═══════════════ seek bar ═══════════════           │
-///     │  [◄◄][▶][▐▐][■][▶▶] [▲] [SHUFFLE] [R]       [⚡]    │
-///     └─────────────────────────────────────────────────────┘
+/// The composition is implemented in `WinampMainWindowSkinned.swift` — this
+/// thin wrapper keeps the legacy type name so the window controller built by
+/// `WinampAppDelegate` (and the iOS / preview callers in `WinampLayout`)
+/// still resolves without any changes.
 struct WinampMainWindow: View {
     var body: some View {
-        VStack(spacing: 0) {
-            // Title bar
-            WinampTitleBar(title: "WINAMP")
-
-            VStack(spacing: 1) {
-                // LCD display (Playbar + info rows)
-                WinampDisplay()
-                    .padding(.horizontal, 3)
-                    .padding(.top, 2)
-
-                // Audio progress bar
-                WinampSeekBar()
-                    .padding(.horizontal, 6)
-                    .padding(.top, 1)
-
-                // Transport controls row
-                WinampControlStrip()
-            }
-            .padding(.bottom, 2)
-        }
-        .background(WinampTheme.frameBg)
-        .overlay(
-            Rectangle().strokeBorder(
-                LinearGradient(
-                    colors: [WinampTheme.frameHighlight, WinampTheme.frameShadow],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
-            )
-        )
+        WinampMainWindowSkinned()
     }
 }
 

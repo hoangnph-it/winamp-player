@@ -68,25 +68,6 @@ struct WinampTitleBar: View {
                 }
                 .padding(.trailing, 3)
             }
-
-            // Drag handle (macOS only). A zero-cost AppKit layer whose
-            // `mouseDownCanMoveWindow` returns true, so clicks in the
-            // central region of the title bar start a window drag exactly
-            // like a classic macOS title bar. We reserve ~12px on the left
-            // (LED indicator) and ~36px on the right (three window-control
-            // buttons) so those UI elements remain clickable in future
-            // phases without needing further plumbing.
-            #if os(macOS)
-            HStack(spacing: 0) {
-                Color.clear
-                    .frame(width: 12)
-                    .allowsHitTesting(false)
-                WindowDragArea()
-                Color.clear
-                    .frame(width: 36)
-                    .allowsHitTesting(false)
-            }
-            #endif
         }
         .frame(height: 14)
     }
