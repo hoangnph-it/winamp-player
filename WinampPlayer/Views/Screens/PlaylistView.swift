@@ -320,18 +320,18 @@ private struct PlaylistStatusBar: View {
             path.contains("/Library/CloudStorage/")
             || path.contains("/Library/Mobile Documents/")
 
-        // Start access synchronously (in the picker callback scope) so the
-        // grant from fileImporter is extended before we hop onto a Task.
-        let started = folderURL.startAccessingSecurityScopedResource()
+        // Retain security-scoped access to this folder for the app's
+        // lifetime so that later playback of individual tracks (child
+        // URLs) can read through the parent scope on iOS. Without this,
+        // `AVAudioPlayer` fails with OSStatus -54 (permErr) once the
+        // picker's implicit grant expires.
+        library.retainAccess(to: folderURL)
 
         // Show immediate feedback so user knows the scan is running.
         library.scanProgress = "Scanning \(folderURL.lastPathComponent)…"
         library.errorMessage = nil
 
         Task {
-            defer {
-                if started { folderURL.stopAccessingSecurityScopedResource() }
-            }
 
             let fm = FileManager.default
             let supported: Set<String> = ["mp3", "wav"]
@@ -394,15 +394,23 @@ private struct PlaylistStatusBar: View {
     }
 
     /// Add one or more individually-picked audio files to the playlist.
+    ///
+    /// Retains security-scoped access to each picked URL via the library
+    /// manager — iOS requires that the scope be held at playback time,
+    /// not just during the initial picker callback, otherwise the later
+    /// `AVAudioPlayer(contentsOf:)` read fails with `OSStatus -54`.
     private func addFiles(_ urls: [URL]) {
+        // Retain scope synchronously (still inside the picker callback)
+        // before hopping to a background Task for metadata loading.
+        for url in urls {
+            library.retainAccess(to: url)
+        }
         Task {
             var tracks: [Track] = []
             for url in urls {
-                let started = url.startAccessingSecurityScopedResource()
                 var track = Track(fileURL: url)
                 await track.loadMetadata()
                 tracks.append(track)
-                if started { url.stopAccessingSecurityScopedResource() }
             }
             await MainActor.run {
                 player.addToPlaylist(tracks)

@@ -36,9 +36,25 @@ struct WinampEqualizer: View {
 
 // MARK: - Classic Winamp EQ presets
 ///
-/// Values are normalized 0…1 (0.5 = 0 dB center, 1.0 = +20 dB,
-/// 0.0 = -20 dB). These match the original Winamp 2.x default presets.
+/// Values are normalized `0…1` where `0.5` is the 0 dB center. Full scale
+/// maps to ±12 dB — matching the classic Winamp 2.x equalizer spec (see
+/// `dBRange`). Converting a slider value to dB:
+///
+///     let dB = (value - 0.5) * 2 * EQPresets.dBRange   // → −12…+12 dB
+///
+/// These values match the original Winamp 2.x default preset shapes.
 enum EQPresets {
+    /// The half-range of the EQ scale, in dB. A slider at 0.0 attenuates
+    /// by `-dBRange` dB; a slider at 1.0 boosts by `+dBRange` dB; 0.5 is
+    /// flat. Winamp 2.x uses 12 dB.
+    static let dBRange: Double = 12.0
+
+    /// Convert a normalized slider value (0…1) to a dB offset in the
+    /// classic Winamp scale.
+    static func decibels(for value: Double) -> Double {
+        (max(0, min(1, value)) - 0.5) * 2 * dBRange
+    }
+
     struct Preset {
         let name: String
         let preamp: Double

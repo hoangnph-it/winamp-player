@@ -30,10 +30,79 @@ class MusicLibraryManager: ObservableObject {
     /// or as a plain bookmark (false, for File Provider URLs like Google Drive).
     private let bookmarkIsScopedKey = "SavedMusicFolderBookmarkIsScoped"
 
+    /// The folder URL we currently hold security-scoped access on.
+    ///
+    /// Crucial for iOS playback: when the user picks a folder via
+    /// `fileImporter`, iOS grants scoped read access to that folder URL
+    /// (and, transitively, its children) ONLY while we keep its scope
+    /// active with `startAccessingSecurityScopedResource()`. Child URLs
+    /// enumerated from the folder do not individually inherit the scope —
+    /// they can only be read while the parent folder's scope is held.
+    ///
+    /// We therefore activate access once (on pick or on bookmark restore)
+    /// and keep it alive for the entire app lifetime so that
+    /// `AVAudioPlayer(contentsOf:)` can open individual track files
+    /// without per-file scope juggling. Without this, iOS refuses the
+    /// file read with `OSStatus -54 (permErr)`.
+    private var accessedFolderURL: URL?
+
+    /// Additional URLs picked ad-hoc from the Playlist's ADD menu
+    /// (individual files or extra folders) whose security-scoped access
+    /// we retain for the lifetime of this manager. Same iOS playback
+    /// rationale as `accessedFolderURL`: we must hold the scope that
+    /// was granted by the picker for the `AVAudioPlayer` read to succeed.
+    private var extraAccessedURLs: Set<URL> = []
+
     // MARK: - Initialization
 
     init() {
         restoreBookmark()
+    }
+
+    deinit {
+        releaseFolderAccess()
+        for url in extraAccessedURLs {
+            url.stopAccessingSecurityScopedResource()
+        }
+        extraAccessedURLs.removeAll()
+    }
+
+    /// Retain security-scoped access to an ad-hoc URL picked from the
+    /// Playlist's ADD menu. Idempotent — safe to call multiple times
+    /// with the same URL. Access stays alive until the manager is
+    /// deallocated (i.e. app termination).
+    func retainAccess(to url: URL) {
+        if extraAccessedURLs.contains(url) { return }
+        if url.startAccessingSecurityScopedResource() {
+            extraAccessedURLs.insert(url)
+        }
+        // If start returned false (File Provider URLs) we don't insert,
+        // but read access may still work through the picker's implicit
+        // grant; nothing to release in that case.
+    }
+
+    // MARK: - Folder-level security-scoped access
+
+    /// Activate and hold security-scoped access on `url`. No-op if we're
+    /// already holding this exact URL.
+    private func activateFolderAccess(_ url: URL) {
+        if accessedFolderURL == url { return }
+        releaseFolderAccess()
+        if url.startAccessingSecurityScopedResource() {
+            accessedFolderURL = url
+        } else {
+            // For File Provider URLs (iCloud Drive, Google Drive) the call
+            // may return false but access may still succeed — proceed.
+            accessedFolderURL = nil
+        }
+    }
+
+    /// Release whatever folder scope we're currently holding.
+    private func releaseFolderAccess() {
+        if let url = accessedFolderURL {
+            url.stopAccessingSecurityScopedResource()
+            accessedFolderURL = nil
+        }
     }
 
     /// Check if iCloud is available
@@ -156,11 +225,17 @@ class MusicLibraryManager: ObservableObject {
                 print("Bookmark is stale, attempting to refresh…")
                 if url.startAccessingSecurityScopedResource() {
                     saveBookmark(for: url)
-                    url.stopAccessingSecurityScopedResource()
+                    // Don't stop — we want to keep holding the scope.
+                    accessedFolderURL = url
                 } else {
                     needsFolderSelection = true
                     return
                 }
+            } else {
+                // Acquire and hold the folder's security scope so that
+                // playback of individual tracks (child URLs) succeeds
+                // on iOS. See `accessedFolderURL` comment above.
+                activateFolderAccess(url)
             }
 
             selectedFolderURL = url
@@ -190,6 +265,11 @@ class MusicLibraryManager: ObservableObject {
     func scanFolder(at url: URL) {
         selectedFolderURL = url
         needsFolderSelection = false
+        // Acquire and hold the folder's security scope for the app's
+        // lifetime so subsequent playback reads of individual tracks
+        // (child URLs) succeed on iOS. Must happen before scanning or
+        // saving the bookmark so File Provider URLs resolve correctly.
+        activateFolderAccess(url)
         saveBookmark(for: url)
         scanLocalFolder(url)
     }
@@ -204,14 +284,12 @@ class MusicLibraryManager: ObservableObject {
         Task {
             var discoveredTracks: [Track] = []
 
-            // Start security-scoped access (required for iCloud Drive / sandboxed folders)
-            let didStartAccess = folderURL.startAccessingSecurityScopedResource()
-
-            defer {
-                if didStartAccess {
-                    folderURL.stopAccessingSecurityScopedResource()
-                }
-            }
+            // Security-scoped access is already held by `activateFolderAccess`
+            // (see caller paths) — no need to acquire/release here. That
+            // scope persists for the app's lifetime so later playback of
+            // individual tracks can read through it. If scope acquisition
+            // failed earlier we still attempt the scan; some File Provider
+            // URLs grant access without needing explicit scope activation.
 
             guard let enumerator = fileManager.enumerator(
                 at: folderURL,
@@ -285,7 +363,9 @@ class MusicLibraryManager: ObservableObject {
     // MARK: - Reset
 
     func clearSavedFolder() {
+        releaseFolderAccess()
         UserDefaults.standard.removeObject(forKey: bookmarkKey)
+        UserDefaults.standard.removeObject(forKey: bookmarkIsScopedKey)
         selectedFolderURL = nil
         tracks = []
         needsFolderSelection = true
