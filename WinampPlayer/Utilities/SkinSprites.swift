@@ -212,6 +212,28 @@ enum Sprites {
         static let expandBtn = SpriteRect(x: 150, y: 42, width: 9, height: 9)
     }
 
+    // MARK: - gen.bmp (generic window chrome — 9-slice; used by Media Library)
+    ///
+    /// `GEN.BMP` is 194×109 in the classic skin; the layout mirrors
+    /// `PLEDIT.BMP`'s 9-slice pattern at a narrower width (top row 20 px,
+    /// bottom row 38 px, side tiles 29 px tall).
+    enum GEN {
+        // Top row — focused / unfocused variants
+        static let topLeftFocused    = SpriteRect(x:   0, y:  0, width: 25, height: 20)
+        static let topLeftUnfocused  = SpriteRect(x:   0, y: 21, width: 25, height: 20)
+        static let topTileFocused    = SpriteRect(x:  25, y:  0, width: 25, height: 20)
+        static let topTileUnfocused  = SpriteRect(x:  25, y: 21, width: 25, height: 20)
+        static let topRightFocused   = SpriteRect(x: 169, y:  0, width: 25, height: 20)
+        static let topRightUnfocused = SpriteRect(x: 169, y: 21, width: 25, height: 20)
+        // Side tiles — same pattern as PLEDIT.BMP (leftTile 12-wide, rightTile 20-wide)
+        static let leftTile  = SpriteRect(x:  0, y: 42, width: 12, height: 29)
+        static let rightTile = SpriteRect(x: 31, y: 42, width: 20, height: 29)
+        // Bottom row (3 segments)
+        static let bottomLeft  = SpriteRect(x:   0, y: 72, width: 25, height: 14)
+        static let bottomTile  = SpriteRect(x:  25, y: 72, width: 25, height: 14)
+        static let bottomRight = SpriteRect(x: 169, y: 72, width: 25, height: 14)
+    }
+
     // MARK: - text.bmp (classic 5x6 bitmap font — 3 rows of 31 glyphs)
     enum TEXT {
         static let charWidth: CGFloat  = 5

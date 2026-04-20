@@ -105,7 +105,7 @@ final class WinampAppDelegate: NSObject, NSApplicationDelegate {
         coordinator.register(plController)
 
         let libController = WinampWindowController(kind: .library) {
-            LibraryBrowserView()
+            WinampLibrarySkinned()
                 .environmentObject(self.player)
                 .environmentObject(self.library)
         }

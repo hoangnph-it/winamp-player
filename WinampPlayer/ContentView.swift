@@ -93,23 +93,14 @@ struct WinampMainWindow: View {
     }
 }
 
-// MARK: - The Playlist "window" (Title bar + list + ADD/REM/SEL/MISC bar)
+// MARK: - The Playlist "window" (Phase 5: real Winamp skin sprites)
+///
+/// The composition is implemented in `WinampPlaylistSkinned.swift` — this
+/// thin wrapper keeps the legacy type name so the window controller built by
+/// `WinampAppDelegate` (and the iOS / preview callers in `WinampLayout`)
+/// still resolves without any changes.
 struct WinampPlaylistWindow: View {
     var body: some View {
-        VStack(spacing: 0) {
-            WinampTitleBar(title: "WINAMP PLAYLIST")
-            PlaylistView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .background(WinampTheme.frameBg)
-        .overlay(
-            Rectangle().strokeBorder(
-                LinearGradient(
-                    colors: [WinampTheme.frameHighlight, WinampTheme.frameShadow],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
-            )
-        )
+        WinampPlaylistSkinned()
     }
 }

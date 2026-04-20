@@ -36,6 +36,9 @@
 		9B613B8A2F938187005B3E0C /* WinampAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B613B802F938187005B3E0C /* WinampAppDelegate.swift */; };
 		9BDF1A022FAABB01005B3E0C /* WindowDragArea.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BDF1A012FAABB01005B3E0C /* WindowDragArea.swift */; };
 		9BDF1A042FAABB02005B3E0C /* WinampMainWindowSkinned.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BDF1A032FAABB02005B3E0C /* WinampMainWindowSkinned.swift */; };
+		9BDF1A062FAABB03005B3E0C /* WinampEqualizerSkinned.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BDF1A052FAABB03005B3E0C /* WinampEqualizerSkinned.swift */; };
+		9BDF1A082FAABB04005B3E0C /* WinampPlaylistSkinned.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BDF1A072FAABB04005B3E0C /* WinampPlaylistSkinned.swift */; };
+		9BDF1A0A2FAABB05005B3E0C /* WinampLibrarySkinned.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BDF1A092FAABB05005B3E0C /* WinampLibrarySkinned.swift */; };
 		A10001 /* WinampPlayerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001 /* WinampPlayerApp.swift */; };
 		A10002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002 /* ContentView.swift */; };
 		A10003 /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10003 /* Track.swift */; };
@@ -79,6 +82,9 @@
 		9B613B102F9379A4005B3E0C /* WinampVolumeControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WinampVolumeControl.swift; sourceTree = "<group>"; };
 		9BDF1A012FAABB01005B3E0C /* WindowDragArea.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowDragArea.swift; sourceTree = "<group>"; };
 		9BDF1A032FAABB02005B3E0C /* WinampMainWindowSkinned.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WinampMainWindowSkinned.swift; sourceTree = "<group>"; };
+		9BDF1A052FAABB03005B3E0C /* WinampEqualizerSkinned.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WinampEqualizerSkinned.swift; sourceTree = "<group>"; };
+		9BDF1A072FAABB04005B3E0C /* WinampPlaylistSkinned.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WinampPlaylistSkinned.swift; sourceTree = "<group>"; };
+		9BDF1A092FAABB05005B3E0C /* WinampLibrarySkinned.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WinampLibrarySkinned.swift; sourceTree = "<group>"; };
 		9B613B122F9379A4005B3E0C /* LibraryBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryBrowserView.swift; sourceTree = "<group>"; };
 		9B613B132F9379A4005B3E0C /* PlaylistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistView.swift; sourceTree = "<group>"; };
 		9B613B142F9379A4005B3E0C /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
@@ -165,6 +171,9 @@
 				9B613B102F9379A4005B3E0C /* WinampVolumeControl.swift */,
 				9BDF1A012FAABB01005B3E0C /* WindowDragArea.swift */,
 				9BDF1A032FAABB02005B3E0C /* WinampMainWindowSkinned.swift */,
+				9BDF1A052FAABB03005B3E0C /* WinampEqualizerSkinned.swift */,
+				9BDF1A072FAABB04005B3E0C /* WinampPlaylistSkinned.swift */,
+				9BDF1A092FAABB05005B3E0C /* WinampLibrarySkinned.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -385,6 +394,9 @@
 				9B613B8A2F938187005B3E0C /* WinampAppDelegate.swift in Sources */,
 				9BDF1A022FAABB01005B3E0C /* WindowDragArea.swift in Sources */,
 				9BDF1A042FAABB02005B3E0C /* WinampMainWindowSkinned.swift in Sources */,
+				9BDF1A062FAABB03005B3E0C /* WinampEqualizerSkinned.swift in Sources */,
+				9BDF1A082FAABB04005B3E0C /* WinampPlaylistSkinned.swift in Sources */,
+				9BDF1A0A2FAABB05005B3E0C /* WinampLibrarySkinned.swift in Sources */,
 				9B613B1C2F9379A4005B3E0C /* SkinAssets.swift in Sources */,
 				9B613B1D2F9379A4005B3E0C /* SkinSprites.swift in Sources */,
 				9B613B1E2F9379A4005B3E0C /* AudioVisualizerView.swift in Sources */,
