@@ -161,6 +161,15 @@ final class WindowCoordinator: ObservableObject {
     }
 
     func windowDidBecomeKey(_ controller: WinampWindowController) {
+        // Ensure the app itself is the foreground app. Without this a click
+        // that arrives while the app is backgrounded (or never fully
+        // activated after launch) only raises this one window and leaves
+        // the rest of the cluster looking "stuck" — the user perceives that
+        // as windows being transparent/unresponsive.
+        if !NSApp.isActive {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+
         // Classic Winamp cluster-raise: clicking any window brings all
         // currently-visible cluster windows to the front in their natural
         // stacking order (main on top).

@@ -24,6 +24,17 @@ final class WinampAppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Promote the app to a regular foreground app with menu bar + Dock
+        // icon, and activate it so the borderless windows we're about to
+        // open are actually clickable. Without this, macOS leaves the app
+        // in an ambiguous activation state (our only SwiftUI scene is a
+        // `Settings` placeholder, so SwiftUI itself never triggers
+        // foreground activation), and clicks on our windows get swallowed
+        // just to bring the app to the front — which looks like "the
+        // windows are transparent / unclickable" to the user.
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
         buildControllers()
         coordinator.placeWindows()
 
@@ -74,6 +85,16 @@ final class WinampAppDelegate: NSObject, NSApplicationDelegate {
                                        hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
             coordinator.controller(for: .main)?.show()
+        }
+        // Clicking the Dock icon (or the app bundle) should always bring
+        // the Winamp cluster to the front, regardless of whether any
+        // window was already visible. Borderless NSWindows don't trigger
+        // this on their own.
+        NSApp.activate(ignoringOtherApps: true)
+        for kind in [WinampWindowKind.main, .equalizer, .playlist, .library] {
+            if let c = coordinator.controller(for: kind), c.isVisible {
+                c.window.orderFrontRegardless()
+            }
         }
         return true
     }

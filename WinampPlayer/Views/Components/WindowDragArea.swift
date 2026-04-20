@@ -23,6 +23,12 @@ struct WindowDragArea: NSViewRepresentable {
 
     private class DragView: NSView {
         override var mouseDownCanMoveWindow: Bool { true }
+
+        /// Accept the first click even when the app/window is inactive so
+        /// the user doesn't have to double-click a title-bar region just to
+        /// activate the app. AppKit still performs activation as a side
+        /// effect of this click.
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     }
 }
 #endif

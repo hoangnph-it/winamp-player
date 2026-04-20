@@ -114,5 +114,13 @@ final class WinampHostingWindow: NSWindow {
 /// target — as a drag gesture on the window.
 private final class DragContainerView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
+
+    /// Accept the first mouse-down even when the window (or the app) is
+    /// inactive. By default AppKit swallows the first click on an
+    /// inactive borderless window just to activate it, which makes every
+    /// control in our window feel like it needs two clicks. Returning
+    /// `true` here routes the click to SwiftUI's hit-test normally and
+    /// AppKit still handles activation as a side effect.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 #endif
