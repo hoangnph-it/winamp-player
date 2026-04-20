@@ -70,7 +70,16 @@ final class WinampHostingWindow: NSWindow {
         // instead of being swallowed silently. Interactive SwiftUI controls
         // still take precedence — their own hit-test regions get the events
         // first, and only "background" clicks ever reach this layer.
-        let host = NSHostingView(rootView: AnyView(rootView()))
+        //
+        // We use `FirstMouseHostingView` (a tiny NSHostingView subclass)
+        // instead of NSHostingView directly so the view returns `true` from
+        // `acceptsFirstMouse(for:)`. AppKit hit-tests depth-first — clicks
+        // reach the hosting view *before* our DragContainerView underneath —
+        // and the default NSHostingView swallows the first click on an
+        // inactive window just to activate it. That's the root cause of
+        // "I can click EQ and Playlist but not the main window": whichever
+        // window is currently non-key loses its first click entirely.
+        let host = FirstMouseHostingView(rootView: AnyView(rootView()))
         host.translatesAutoresizingMaskIntoConstraints = false
         let container = DragContainerView(frame: contentRect)
         container.addSubview(host)
@@ -122,5 +131,73 @@ private final class DragContainerView: NSView {
     /// `true` here routes the click to SwiftUI's hit-test normally and
     /// AppKit still handles activation as a side effect.
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+/// `NSHostingView` subclass that (1) accepts first-mouse events and
+/// (2) makes every "dead" (non-interactive) SwiftUI region drag the
+/// window, matching classic Winamp's "any chrome click = drag" feel.
+///
+/// Two AppKit-vs-SwiftUI impedance mismatches bite us here:
+///
+/// 1. **First-mouse swallow.** Stock `NSHostingView.acceptsFirstMouse(for:)`
+///    returns `false`, so AppKit swallows the first click on any window
+///    that isn't already key. Because clicks never make it into SwiftUI
+///    on that first event, the user sees interactive controls as
+///    unresponsive until they click a second time. Returning `true`
+///    routes that first click through SwiftUI's hit-test immediately.
+///
+/// 2. **Dead-region swallow.** `NSHostingView.hitTest(_:)` resolves most
+///    "chrome" clicks to the hosting view (or to one of SwiftUI's own
+///    internal container NSViews) rather than to a deeper
+///    gesture-bearing subview. By default, AppKit delivers `mouseDown`
+///    to that target but its `mouseDownCanMoveWindow` is `false`, so
+///    the click is silently eaten and the window stays put. Previously
+///    we tried to patch this by returning `nil` from `hitTest` whenever
+///    `super.hitTest(point) === self` — but that check only catches the
+///    hosting view itself, and **misses** the case where SwiftUI
+///    returns an internal (non-`self`, non-interactive) hosting
+///    subview. That's why the main window — which has more overlaid
+///    sprite layers than Equalizer/Playlist — had lots of chrome
+///    regions that felt "transparent and unclickable" while the
+///    simpler windows worked.
+///
+///    The more reliable fix is structural: override
+///    `mouseDownCanMoveWindow` on the hosting view itself to return
+///    `true`. AppKit consults `mouseDownCanMoveWindow` on the
+///    final hit target, so **any** click that lands on the hosting
+///    view (including its internal container descendants that inherit
+///    the NSView default of `false`, unless they override it) still
+///    ends up starting a window drag because the property is resolved
+///    via the normal key-value lookup on the NSView subclass — and
+///    the drag-activation code walks up the responder chain from the
+///    hit view to find a target that wants the drag.
+///
+///    This works alongside the hosting window's
+///    `isMovableByWindowBackground` and the underlying
+///    `DragContainerView`, which remain as backstops.
+///
+///    Interactive SwiftUI controls (buttons, sliders, toggles) are
+///    backed by *deeper* NSView instances created by SwiftUI's
+///    gesture-recognition machinery. Their `hitTest` returns those
+///    views rather than the hosting view, AppKit delivers the
+///    `mouseDown` to them, and SwiftUI's gesture recognizers run
+///    normally — so the controls still work.
+private final class FirstMouseHostingView: NSHostingView<AnyView> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    /// Make the entire hosting-view background a drag handle. See the
+    /// long comment above for why this replaces the previous
+    /// `hitTest`-returning-`nil` trick.
+    override var mouseDownCanMoveWindow: Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let hit = super.hitTest(point)
+        // Belt-and-braces: if SwiftUI's own hit-testing lands on the
+        // hosting view (no deeper subview claimed the point), fall back
+        // to the container NSView beneath so AppKit's background-drag
+        // path fires even on systems where `mouseDownCanMoveWindow` on
+        // an NSHostingView isn't honored.
+        return hit === self ? nil : hit
+    }
 }
 #endif

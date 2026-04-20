@@ -47,6 +47,37 @@ struct WinampMainWindowSkinned: View {
             )
             .allowsHitTesting(false)
 
+            // NOTE: We intentionally do NOT insert a full-canvas
+            // `WindowDragArea` here, even though it looks like the obvious
+            // way to make the "dead" chrome regions drag the window.
+            //
+            // The hosting infrastructure already covers drag-in-dead-region
+            // in three layers (see `WinampHostingWindow.swift`):
+            //   1. `NSWindow.isMovableByWindowBackground = true`,
+            //   2. `DragContainerView.mouseDownCanMoveWindow = true` (the
+            //      window's contentView, sitting *beneath* the hosting view),
+            //   3. `FirstMouseHostingView.hitTest` returns `nil` when
+            //      SwiftUI has no hit at that point, so AppKit keeps
+            //      searching and lands on the DragContainerView which
+            //      starts the drag.
+            //
+            // Putting a full-canvas `WindowDragArea` (NSViewRepresentable
+            // backed by a real NSView) into this ZStack actually *breaks*
+            // hit-testing on controls stacked above it. AppKit hit-tests
+            // subviews in reverse order, but only SwiftUI views that
+            // register their own NSView (typically gesture-bearing views)
+            // sit "above" the DragView — every other region (bitrate/
+            // sample-rate text, marquee title, mono/stereo indicators,
+            // balance slider, inter-control gaps) has no NSView of its
+            // own. AppKit hits the DragView first and starts a drag,
+            // swallowing what looked like a click. That was exactly the
+            // "transparent and unclickable" symptom the user reported on
+            // the main window specifically (EQ + Playlist only scope
+            // `WindowDragArea` to the title bar, so they never had the
+            // bug). Removing this layer lets SwiftUI gestures hit-test
+            // normally and delegates drag-on-dead-regions to the
+            // hosting window's background-drag path.
+
             // TITLEBAR.BMP is drawn *over* the top 14 rows of MAIN.BMP.
             SkinnedTitleBar(scale: scale)
                 .frame(width: 275 * scale, height: 14 * scale)
@@ -116,6 +147,13 @@ struct WinampMainWindowSkinned: View {
 
     /// Tiny 9×9 icon showing the current playback state (green ▶ / yellow ⏸ /
     /// red ■). Sits just to the left of the time digits.
+    ///
+    /// Marked non-hit-testable: this is a purely ornamental read-out with no
+    /// gesture. Without `.allowsHitTesting(false)` SwiftUI happily hands
+    /// clicks on the sprite to its invisible NSHostingView-backed frame,
+    /// swallowing them silently. With it off, clicks in the display area
+    /// fall through to the window's drag container instead, which is the
+    /// classic Winamp behaviour (clicking the chrome anywhere drags it).
     @ViewBuilder
     private var playPauseStateIcon: some View {
         let rect: SpriteRect = {
@@ -126,6 +164,7 @@ struct WinampMainWindowSkinned: View {
             }
         }()
         SpriteView(sheet: .playpaus, rect: rect, scale: scale)
+            .allowsHitTesting(false)
     }
 
     /// Big green LCD digits (9×13 each) showing elapsed/remaining time.
@@ -151,6 +190,9 @@ struct WinampMainWindowSkinned: View {
                 digit(s % 10)
             }
         }
+        // Time read-out is non-interactive — clicks on it should drop
+        // through to the drag container beneath (matches classic Winamp).
+        .allowsHitTesting(false)
     }
 
     private func digit(_ n: Int) -> some View {
@@ -179,6 +221,7 @@ struct WinampMainWindowSkinned: View {
     private var songTitleMarquee: some View {
         let title = marqueeText
         BitmapMarquee(text: title, pixelWidth: 154 * scale, scale: scale)
+            .allowsHitTesting(false)
     }
 
     private var marqueeText: String {
@@ -199,6 +242,7 @@ struct WinampMainWindowSkinned: View {
         let value = player.bitrate
         let text = value > 0 ? String(format: "%3d", value) : "   "
         BitmapFontView(text: text, scale: scale)
+            .allowsHitTesting(false)
     }
 
     /// Sample rate readout, e.g. "44" for 44100 Hz.
@@ -207,6 +251,7 @@ struct WinampMainWindowSkinned: View {
         let hz = player.sampleRate
         let text = hz > 0 ? String(format: "%2d", hz / 1000) : "  "
         BitmapFontView(text: text, scale: scale)
+            .allowsHitTesting(false)
     }
 
     /// Mono indicator (27×12). Lit when the playing file has a single channel.
@@ -218,6 +263,7 @@ struct WinampMainWindowSkinned: View {
             rect: isMono ? Sprites.MONOSTER.monoActive : Sprites.MONOSTER.monoInactive,
             scale: scale
         )
+        .allowsHitTesting(false)
     }
 
     /// Stereo indicator (29×12).
@@ -229,6 +275,7 @@ struct WinampMainWindowSkinned: View {
             rect: isStereo ? Sprites.MONOSTER.stereoActive : Sprites.MONOSTER.stereoInactive,
             scale: scale
         )
+        .allowsHitTesting(false)
     }
 
     /// We don't expose a channel-count signal directly; approximate via
@@ -270,10 +317,13 @@ struct WinampMainWindowSkinned: View {
 
     /// Balance slider — 38×13. We don't wire to an AudioPlayerManager
     /// balance channel yet (Phase 3 scope), so the thumb stays centered
-    /// and dragging updates local state only.
+    /// and dragging updates local state only. Marked non-hit-testable
+    /// so clicks in its region drop through to the drag container rather
+    /// than being silently swallowed.
     @ViewBuilder
     private var balanceSlider: some View {
         StaticCenteredBalanceSlider(scale: scale)
+            .allowsHitTesting(false)
     }
 
     // MARK: - Window cluster toggles
@@ -623,6 +673,17 @@ struct SkinnedSlider: View {
         let thumbY = (bgHeight - thumbHeight) / 2
 
         ZStack(alignment: .topLeading) {
+            // Transparent hit-target sitting underneath the art. Without
+            // this, every child of the ZStack is `.allowsHitTesting(false)`
+            // and the outer `.contentShape(Rectangle())` + `.gesture(...)`
+            // has no concrete hit-testable content for SwiftUI's gesture
+            // recognizer to anchor against — clicks on the slider silently
+            // do nothing. The working EQ slider (`EQBandSlider`) uses the
+            // same pattern.
+            Color.clear
+                .frame(width: bgWidth * scale, height: bgHeight * scale)
+                .contentShape(Rectangle())
+
             SpriteView(sheet: backgroundSheet, rect: backgroundRectBuilder(row), scale: scale)
                 .allowsHitTesting(false)
             SpriteView(
@@ -703,6 +764,13 @@ struct SkinnedSeekBar: View {
         let thumbX = travel * CGFloat(clamped)
 
         ZStack(alignment: .topLeading) {
+            // Transparent hit-target — required so the outer `.gesture()`
+            // has concrete hit-testable content. See SkinnedSlider for the
+            // long explanation; same SwiftUI quirk applies here.
+            Color.clear
+                .frame(width: bgWidth * scale, height: bgHeight * scale)
+                .contentShape(Rectangle())
+
             SpriteView(sheet: .posbar, rect: Sprites.POSBAR.background, scale: scale)
                 .allowsHitTesting(false)
             if isEnabled {

@@ -66,8 +66,18 @@ final class WinampAppDelegate: NSObject, NSApplicationDelegate {
     /// idempotent (we remove any pre-existing `winamp`-tagged items first)
     /// and it covers the rare case where SwiftUI regenerates the menu bar
     /// when another app returns focus.
+    ///
+    /// Also force every visible cluster window to the front. Borderless
+    /// `NSWindow`s at `level = .normal` do not automatically reorder above
+    /// other applications' windows when our app becomes frontmost — which
+    /// is why clicking the Dock icon previously *activated* the app but
+    /// left the Winamp windows hidden behind whatever app the user was
+    /// looking at. Ordering them front here is the reliable hook; it fires
+    /// for every activation path (Dock click, Cmd-Tab, relaunch, etc.)
+    /// whereas `applicationShouldHandleReopen` only fires on some of them.
     func applicationDidBecomeActive(_ notification: Notification) {
         installMenuShortcuts()
+        bringClusterToFront()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -83,20 +93,42 @@ final class WinampAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication,
                                        hasVisibleWindows flag: Bool) -> Bool {
-        if !flag {
+        // Clicking the Dock icon (or double-clicking the app bundle) should
+        // always bring the Winamp cluster to the front. If no cluster
+        // window is currently visible, unhide the main window first — the
+        // user can bring up the EQ / Playlist / Library from the clutterbar.
+        let anyVisible = WinampWindowKind.allCases.contains {
+            coordinator.controller(for: $0)?.isVisible == true
+        }
+        if !anyVisible {
             coordinator.controller(for: .main)?.show()
         }
-        // Clicking the Dock icon (or the app bundle) should always bring
-        // the Winamp cluster to the front, regardless of whether any
-        // window was already visible. Borderless NSWindows don't trigger
-        // this on their own.
         NSApp.activate(ignoringOtherApps: true)
-        for kind in [WinampWindowKind.main, .equalizer, .playlist, .library] {
+        bringClusterToFront()
+        return true
+    }
+
+    /// Re-orders every currently-visible cluster window above other apps.
+    /// Uses `orderFrontRegardless` because our windows live at `.normal`
+    /// level — plain `orderFront(nil)` won't lift them above another app's
+    /// frontmost window, which is exactly the "Dock icon does nothing"
+    /// symptom the user sees.
+    private func bringClusterToFront() {
+        // Order bottom-up so the natural cluster stacking ends with main
+        // on top (matches classic Winamp). Skip library if it's hidden.
+        let stack: [WinampWindowKind] = [.library, .playlist, .equalizer, .main]
+        for kind in stack {
             if let c = coordinator.controller(for: kind), c.isVisible {
                 c.window.orderFrontRegardless()
             }
         }
-        return true
+        // Make the main window key if nothing else currently is — so
+        // keyboard shortcuts route correctly after activation.
+        if NSApp.keyWindow == nil,
+           let main = coordinator.controller(for: .main),
+           main.isVisible {
+            main.window.makeKey()
+        }
     }
 
     // MARK: - Window construction
