@@ -12,6 +12,14 @@ import AppKit
 /// and modifier-key behavior, without us having to handle `mouseDown` or
 /// manage drag state by hand.
 ///
+/// Cluster-raise on click (classic Winamp "click any window → all three
+/// come forward") is handled one level up, in `WinampHostingWindow.sendEvent`,
+/// which observes every mousedown the window receives *before* hit-testing.
+/// Keeping that concern off of this view lets the drag handle stay pure
+/// AppKit and avoids the SwiftUI-vs-NSView gesture-priority issues that
+/// arise when we try to override `mouseDown` on a view whose parent is
+/// already an NSHostingView with attached gesture recognizers.
+///
 /// Place one over any SwiftUI region you want to be draggable (e.g. the
 /// Winamp title bar). It's transparent — the views *below* still render
 /// normally. The only thing it changes is mouse event semantics.

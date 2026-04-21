@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// Phase-3 pixel-accurate rebuild of the classic Winamp 2.x main window,
 /// composed from the real skin bitmaps (MAIN.BMP + TITLEBAR.BMP + CBUTTONS.BMP
@@ -40,43 +43,40 @@ struct WinampMainWindowSkinned: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             // Base chrome — the entire window background is MAIN.BMP.
+            //
+            // This view is hit-testable (no `.allowsHitTesting(false)`) so
+            // that clicks in every "dead" region of the main window — the
+            // mini visualizer slot, the NULLSOFT WINAMP title readout, the
+            // kbps/kHz labels, the mono/stereo indicators, the balance
+            // slider, the logo, or any inter-control gap — land on this
+            // sprite. Ornamental overlays that sit on top of it (time
+            // digits, song title marquee, bitrate/sample-rate text, etc.)
+            // are still `.allowsHitTesting(false)`, so clicks fall through
+            // them onto this base layer. Interactive controls (volume,
+            // buttons, sliders) live above it in z-order, so they continue
+            // to consume their own clicks normally.
+            //
+            // The attached `DragGesture(minimumDistance: 0)` fires on every
+            // mousedown and calls `raiseCluster()`, which mimics classic
+            // Winamp behaviour: clicking *anywhere* on a Winamp window
+            // brings the main + EQ + playlist cluster all to the front
+            // together, even when this window is already the key window
+            // (the `windowDidBecomeKey` path only fires on key *transitions*
+            // and so can't alone cover the "already-focused, clicked
+            // again" case). We use a `DragGesture` rather than
+            // `onTapGesture` because it fires on press rather than
+            // waiting for the full press+release with no motion — matching
+            // the snappy feel of the original app.
             SpriteView(
                 sheet: .main,
                 rect: SpriteRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight),
                 scale: scale
             )
-            .allowsHitTesting(false)
-
-            // NOTE: We intentionally do NOT insert a full-canvas
-            // `WindowDragArea` here, even though it looks like the obvious
-            // way to make the "dead" chrome regions drag the window.
-            //
-            // The hosting infrastructure already covers drag-in-dead-region
-            // in three layers (see `WinampHostingWindow.swift`):
-            //   1. `NSWindow.isMovableByWindowBackground = true`,
-            //   2. `DragContainerView.mouseDownCanMoveWindow = true` (the
-            //      window's contentView, sitting *beneath* the hosting view),
-            //   3. `FirstMouseHostingView.hitTest` returns `nil` when
-            //      SwiftUI has no hit at that point, so AppKit keeps
-            //      searching and lands on the DragContainerView which
-            //      starts the drag.
-            //
-            // Putting a full-canvas `WindowDragArea` (NSViewRepresentable
-            // backed by a real NSView) into this ZStack actually *breaks*
-            // hit-testing on controls stacked above it. AppKit hit-tests
-            // subviews in reverse order, but only SwiftUI views that
-            // register their own NSView (typically gesture-bearing views)
-            // sit "above" the DragView — every other region (bitrate/
-            // sample-rate text, marquee title, mono/stereo indicators,
-            // balance slider, inter-control gaps) has no NSView of its
-            // own. AppKit hits the DragView first and starts a drag,
-            // swallowing what looked like a click. That was exactly the
-            // "transparent and unclickable" symptom the user reported on
-            // the main window specifically (EQ + Playlist only scope
-            // `WindowDragArea` to the title bar, so they never had the
-            // bug). Removing this layer lets SwiftUI gestures hit-test
-            // normally and delegates drag-on-dead-regions to the
-            // hosting window's background-drag path.
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in raiseCluster() }
+            )
 
             // TITLEBAR.BMP is drawn *over* the top 14 rows of MAIN.BMP.
             SkinnedTitleBar(scale: scale)
@@ -469,6 +469,28 @@ struct WinampMainWindowSkinned: View {
             action: { player.cycleRepeatMode() }
         )
     }
+
+    // MARK: - Cluster raise bridge
+    //
+    // Classic Winamp groups the main / equalizer / playlist windows into a
+    // single visual cluster: clicking on *any* of them brings all three to
+    // the front. `WindowCoordinator.raiseCluster(focus:)` owns that logic,
+    // but SwiftUI views can't see the coordinator directly — they can only
+    // reach it through the application delegate. This helper is the single
+    // choke-point for that bridge so individual gesture handlers in the
+    // view stay readable.
+    //
+    // The non-macOS stub exists so this file still compiles for iOS/preview
+    // builds where `WinampAppDelegate` isn't available.
+    #if os(macOS)
+    private func raiseCluster() {
+        if let delegate = NSApp.delegate as? WinampAppDelegate {
+            delegate.coordinator.raiseCluster(focus: .main)
+        }
+    }
+    #else
+    private func raiseCluster() { }
+    #endif
 }
 
 // MARK: - Title bar
@@ -485,16 +507,21 @@ private struct SkinnedTitleBar: View {
             SpriteView(sheet: .titlebar, rect: Sprites.TITLEBAR.mainSelected, scale: scale)
                 .allowsHitTesting(false)
 
-            // Window drag handle — occupies the central region of the
-            // title bar so clicks there start a window drag.
+            // Window drag handle — stretched across the *entire* title bar
+            // so every pixel of it (the far-left sample-rate spike art, the
+            // WINAMP wordmark, the long pinstripes, and the empty strips
+            // around the minimize/shade/close buttons) is clickable. The
+            // underlying `DragView` does two things on mouseDown: it calls
+            // `raiseCluster(focus:)` on the shared `WindowCoordinator` so
+            // all three Winamp windows come to the front together (classic
+            // cluster-raise), and it hands the event to `performDrag(with:)`
+            // so the user can still drag the window. The three window
+            // control buttons sit above this in z-order so their clicks
+            // are consumed first — only the gaps around them fall through
+            // to the drag area.
             #if os(macOS)
-            HStack(spacing: 0) {
-                Color.clear.frame(width: 10 * scale, height: 14 * scale).allowsHitTesting(false)
-                WindowDragArea()
-                    .frame(height: 14 * scale)
-                Color.clear.frame(width: 55 * scale, height: 14 * scale).allowsHitTesting(false)
-            }
-            .frame(width: 275 * scale, height: 14 * scale)
+            WindowDragArea()
+                .frame(width: 275 * scale, height: 14 * scale)
             #endif
 
             // Right-edge window-control buttons (minimize, shade, close).
@@ -672,45 +699,48 @@ struct SkinnedSlider: View {
         let thumbX = travel * CGFloat(clamped)
         let thumbY = (bgHeight - thumbHeight) / 2
 
-        ZStack(alignment: .topLeading) {
-            // Transparent hit-target sitting underneath the art. Without
-            // this, every child of the ZStack is `.allowsHitTesting(false)`
-            // and the outer `.contentShape(Rectangle())` + `.gesture(...)`
-            // has no concrete hit-testable content for SwiftUI's gesture
-            // recognizer to anchor against — clicks on the slider silently
-            // do nothing. The working EQ slider (`EQBandSlider`) uses the
-            // same pattern.
-            Color.clear
-                .frame(width: bgWidth * scale, height: bgHeight * scale)
-                .contentShape(Rectangle())
-
-            SpriteView(sheet: backgroundSheet, rect: backgroundRectBuilder(row), scale: scale)
+        // Gesture is attached DIRECTLY to the background SpriteView (a
+        // concrete, hit-testable view) with the thumb painted as a
+        // non-hit-testing `.overlay` on top. This mirrors the exact pattern
+        // that works for `SpriteButton` (single SpriteView + gesture) — no
+        // ZStack+Color.clear indirection, no ambiguity about which child
+        // owns the hit-test.
+        //
+        // Earlier attempts used a ZStack with a `Color.clear` hit target
+        // plus sibling sprites marked `.allowsHitTesting(false)` plus the
+        // gesture on the outer ZStack. That pattern works for `EQBandSlider`
+        // in isolation but was silently dead when embedded in the
+        // `WinampMainWindowSkinned` outer ZStack (where the slider is placed
+        // via `.offset(x:y:)`). Putting the gesture directly on a concrete
+        // sprite avoids any hit-test routing confusion inside the
+        // NSHostingView.
+        SpriteView(sheet: backgroundSheet, rect: backgroundRectBuilder(row), scale: scale)
+            .overlay(alignment: .topLeading) {
+                SpriteView(
+                    sheet: thumbSheet,
+                    rect: isDragging ? thumbPressed : thumb,
+                    scale: scale
+                )
+                .offset(x: thumbX * scale, y: thumbY * scale)
                 .allowsHitTesting(false)
-            SpriteView(
-                sheet: thumbSheet,
-                rect: isDragging ? thumbPressed : thumb,
-                scale: scale
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { g in
+                        isDragging = true
+                        // Anchor the thumb to the cursor — center the thumb
+                        // under the pointer by subtracting half the thumb
+                        // width.
+                        let rawX = g.location.x / scale - thumbWidth / 2
+                        let bounded = max(0, min(travel, rawX))
+                        let newValue = travel > 0 ? Double(bounded / travel) : 0
+                        onChange(newValue)
+                    }
+                    .onEnded { _ in
+                        isDragging = false
+                    }
             )
-            .offset(x: thumbX * scale, y: thumbY * scale)
-            .allowsHitTesting(false)
-        }
-        .frame(width: bgWidth * scale, height: bgHeight * scale, alignment: .topLeading)
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { g in
-                    isDragging = true
-                    // Anchor the thumb to the cursor — center the thumb under
-                    // the pointer by subtracting half the thumb width.
-                    let rawX = g.location.x / scale - thumbWidth / 2
-                    let bounded = max(0, min(travel, rawX))
-                    let newValue = travel > 0 ? Double(bounded / travel) : 0
-                    onChange(newValue)
-                }
-                .onEnded { _ in
-                    isDragging = false
-                }
-        )
     }
 }
 
@@ -763,42 +793,37 @@ struct SkinnedSeekBar: View {
         let travel = max(0, bgWidth - thumbWidth)
         let thumbX = travel * CGFloat(clamped)
 
-        ZStack(alignment: .topLeading) {
-            // Transparent hit-target — required so the outer `.gesture()`
-            // has concrete hit-testable content. See SkinnedSlider for the
-            // long explanation; same SwiftUI quirk applies here.
-            Color.clear
-                .frame(width: bgWidth * scale, height: bgHeight * scale)
-                .contentShape(Rectangle())
-
-            SpriteView(sheet: .posbar, rect: Sprites.POSBAR.background, scale: scale)
-                .allowsHitTesting(false)
-            if isEnabled {
-                SpriteView(
-                    sheet: .posbar,
-                    rect: isDragging ? Sprites.POSBAR.thumbPressed : Sprites.POSBAR.thumb,
-                    scale: scale
-                )
-                .offset(x: thumbX * scale, y: 0)
-                .allowsHitTesting(false)
+        // Same "gesture on concrete sprite" pattern as `SkinnedSlider` —
+        // see that view for the long explanation. The background posbar
+        // sprite is the hit target; the thumb sprite is drawn as a non-
+        // hit-testing overlay on top.
+        SpriteView(sheet: .posbar, rect: Sprites.POSBAR.background, scale: scale)
+            .overlay(alignment: .topLeading) {
+                if isEnabled {
+                    SpriteView(
+                        sheet: .posbar,
+                        rect: isDragging ? Sprites.POSBAR.thumbPressed : Sprites.POSBAR.thumb,
+                        scale: scale
+                    )
+                    .offset(x: thumbX * scale, y: 0)
+                    .allowsHitTesting(false)
+                }
             }
-        }
-        .frame(width: bgWidth * scale, height: bgHeight * scale, alignment: .topLeading)
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { g in
-                    guard isEnabled else { return }
-                    isDragging = true
-                    let rawX = g.location.x / scale - thumbWidth / 2
-                    let bounded = max(0, min(travel, rawX))
-                    let pct = travel > 0 ? Double(bounded / travel) : 0
-                    onScrub(pct)
-                }
-                .onEnded { _ in
-                    isDragging = false
-                }
-        )
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { g in
+                        guard isEnabled else { return }
+                        isDragging = true
+                        let rawX = g.location.x / scale - thumbWidth / 2
+                        let bounded = max(0, min(travel, rawX))
+                        let pct = travel > 0 ? Double(bounded / travel) : 0
+                        onScrub(pct)
+                    }
+                    .onEnded { _ in
+                        isDragging = false
+                    }
+            )
     }
 }
 

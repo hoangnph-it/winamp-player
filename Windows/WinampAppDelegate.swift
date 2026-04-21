@@ -26,9 +26,16 @@ final class WinampAppDelegate: NSObject, NSApplicationDelegate {
         // Main + EQ + Playlist come up on launch. The library window is
         // only shown when the user asks for it (from the `Window` menu or
         // the clutterbar); it stays hidden otherwise.
-        coordinator.controller(for: .main)?.show()
-        coordinator.controller(for: .equalizer)?.show()
+        //
+        // Show order matters: each `show()` calls `makeKeyAndOrderFront`
+        // under the hood, so whichever window is shown LAST becomes the
+        // key window (and, after the coordinator's deferred cluster-raise
+        // runs, the topmost window too). Classic Winamp always wants the
+        // main window to be key+topmost at launch — so we show the
+        // auxiliaries first (playlist, then EQ), and main last.
         coordinator.controller(for: .playlist)?.show()
+        coordinator.controller(for: .equalizer)?.show()
+        coordinator.controller(for: .main)?.show()
         coordinator.refreshLayout()
 
         // Kick off library scanning once on launch (mirrors the original

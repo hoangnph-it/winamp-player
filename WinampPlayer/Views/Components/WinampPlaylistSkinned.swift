@@ -187,18 +187,13 @@ private struct PlaylistTitleBarOverlay: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             #if os(macOS)
-            // Reserve the middle of the top row for window-dragging. Leave
-            // gaps for the left corner art (25 px) and the right-edge
-            // window buttons (~40 px).
-            HStack(spacing: 0) {
-                Color.clear.frame(width: 25 * scale, height: 20 * scale)
-                    .allowsHitTesting(false)
-                WindowDragArea()
-                    .frame(height: 20 * scale)
-                Color.clear.frame(width: 45 * scale, height: 20 * scale)
-                    .allowsHitTesting(false)
-            }
-            .frame(width: width, height: 20 * scale)
+            // Full-width drag handle so every pixel of the title bar
+            // triggers cluster-raise on click (see `WindowDragArea`). The
+            // window-control buttons on the right are drawn later in the
+            // ZStack, so their clicks are consumed before reaching this
+            // drag layer.
+            WindowDragArea()
+                .frame(width: width, height: 20 * scale)
             #endif
 
             // Centered title text (raw bitmap font). Drawn at y=4 so it

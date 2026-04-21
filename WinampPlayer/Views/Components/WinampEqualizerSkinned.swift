@@ -144,14 +144,14 @@ private struct SkinnedEQTitleBar: View {
             SpriteView(sheet: .eqmain, rect: Sprites.EQMAIN.titleSelected, scale: scale)
                 .allowsHitTesting(false)
 
+            // Full-width drag handle — every pixel of the title bar is
+            // click-and-drag, so cluster-raise fires anywhere (see
+            // `WindowDragArea` / `WinampMainWindowSkinned` for the rationale).
+            // The control buttons below are drawn later in the ZStack so
+            // they consume their own clicks before reaching this layer.
             #if os(macOS)
-            HStack(spacing: 0) {
-                Color.clear.frame(width: 10 * scale, height: 14 * scale).allowsHitTesting(false)
-                WindowDragArea()
-                    .frame(height: 14 * scale)
-                Color.clear.frame(width: 55 * scale, height: 14 * scale).allowsHitTesting(false)
-            }
-            .frame(width: 275 * scale, height: 14 * scale)
+            WindowDragArea()
+                .frame(width: 275 * scale, height: 14 * scale)
             #endif
 
             // Minimize / shade / close window-control hotspots.

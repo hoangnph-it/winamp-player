@@ -127,13 +127,41 @@ final class WindowCoordinator: ObservableObject {
         // Classic Winamp cluster-raise: clicking any window brings all
         // currently-visible cluster windows to the front in their natural
         // stacking order (main on top).
+        //
+        // IMPORTANT: This runs on the next run-loop tick, NOT inline. Doing
+        // the ordering inline (during AppKit's own becomeKey processing)
+        // has been observed to leave the main window in a state where the
+        // very first click after launch works, but every subsequent click
+        // on the same window gets silently swallowed — AppKit's mouse-
+        // event routing and key-window bookkeeping both race with our
+        // `orderFront` / `orderFrontRegardless` calls. Deferring by one
+        // tick lets AppKit finish flipping key status first, then we
+        // adjust z-order; the user never sees the transient ordering.
+        let keyedKind = controller.kind
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            guard let keyed = self.controllers[keyedKind],
+                  keyed.window.isKeyWindow else { return }
+            self.raiseCluster(focus: keyedKind)
+        }
+    }
+
+    /// Brings every currently-visible cluster window (main + EQ + playlist)
+    /// to the front, with `focus` rendered topmost. Public so dead-region
+    /// click handlers inside the SwiftUI content can trigger the classic
+    /// Winamp "click anywhere on any window → raise all three" behavior
+    /// even when the target window is already key (in which case the
+    /// `windowDidBecomeKey` path does not fire).
+    func raiseCluster(focus: WinampWindowKind = .main) {
         let clusterKinds: [WinampWindowKind] = [.playlist, .equalizer, .main]
         for k in clusterKinds {
-            if let c = controllers[k], c.window.isVisible, c !== controller {
+            if let c = controllers[k], c.window.isVisible, k != focus {
                 c.window.orderFront(nil)
             }
         }
-        controller.window.orderFrontRegardless()
+        if let focused = controllers[focus], focused.window.isVisible {
+            focused.window.orderFrontRegardless()
+        }
     }
 
     func windowWillClose(_ controller: WinampWindowController) {

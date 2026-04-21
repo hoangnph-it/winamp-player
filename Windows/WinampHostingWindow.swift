@@ -120,9 +120,14 @@ final class WinampHostingWindow: NSWindow {
 
     // MARK: - Focus-cluster coordination
     //
-    // Classic Winamp brings all cluster windows forward together. The
-    // coordinator installs itself as delegate and listens to `windowDidBecomeKey`
-    // to orchestrate that; we just make sure the window *can* become key.
+    // Classic Winamp brings the main + EQ + playlist windows forward
+    // together on any click inside any of them (including dead-region
+    // clicks that don't do anything functionally). That's driven from a
+    // single app-level `NSEvent.addLocalMonitorForEvents(.leftMouseDown)`
+    // hook installed in `WinampAppDelegate.installClusterRaiseMonitor` —
+    // see that method for the full rationale. The monitor runs *before*
+    // any window's `sendEvent`, so this class doesn't need to override
+    // `sendEvent` itself.
     //
     // Height changes (shade-mode collapse/expand) are driven by the
     // `WinampWindowController`, which anchors the top edge so the title

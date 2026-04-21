@@ -160,15 +160,12 @@ private struct LibraryTitleBarOverlay: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             #if os(macOS)
-            HStack(spacing: 0) {
-                Color.clear.frame(width: 25 * scale, height: 20 * scale)
-                    .allowsHitTesting(false)
-                WindowDragArea()
-                    .frame(height: 20 * scale)
-                Color.clear.frame(width: 25 * scale, height: 20 * scale)
-                    .allowsHitTesting(false)
-            }
-            .frame(width: width, height: 20 * scale)
+            // Full-width drag handle so clicks anywhere on the title bar
+            // trigger cluster-raise (see `WindowDragArea`). The close-button
+            // hotspot below is drawn later in the ZStack, so its clicks are
+            // consumed before reaching this layer.
+            WindowDragArea()
+                .frame(width: width, height: 20 * scale)
             #endif
 
             // Centered title (bitmap font)
